@@ -11,7 +11,6 @@ import re
 from datetime import datetime, time, timedelta, timezone
 from pathlib import Path
 
-import markdown
 import yaml
 from dotenv import load_dotenv
 from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
@@ -221,33 +220,6 @@ def write_rubric(path: Path, version: str, dims: dict[str, list[str]]) -> None:
                            "dimensions": {k: {"values": v} for k, v in dims.items()}},
                           sort_keys=False, default_flow_style=None, width=88)
     path.write_text("\n".join(header + [body]))
-
-
-@app.get("/runs")
-def runs_page():
-    runs = [dict(r) for r in _conn().execute("SELECT * FROM runs ORDER BY run_id DESC LIMIT 50")]
-    return render_template("runs.html", runs=runs)
-
-
-@app.get("/build-log")
-def build_log():
-    text = (ROOT / "PROGRESS.md").read_text() if (ROOT / "PROGRESS.md").exists() else ""
-    html = markdown.markdown(text, extensions=["tables", "fenced_code"])
-    return render_template("buildlog.html", html=html)
-
-
-@app.get("/components")
-def components():
-    """Component library and empty/error states, rendered from real data."""
-    conn, rubric = _conn(), load_rubric()
-    d = digest.build(conn, rubric, load_brands())
-    cards = [c for b in d["brands"] for c in b["verdicts"] + b["leaders"]]
-    sample = next((c for c in cards if c["perf"] == "out" and c["theme_line"]), cards[0] if cards else None)
-    shift = next((b["shift"] for b in d["brands"] if b["shift"]), None)
-    perf_examples = [(x, digest.perf_class(x), digest.bar_position(x), digest.fmt_index(x))
-                     for x in (3.2, 1.2, 0.8, 0.3)]
-    return render_template("components.html", sample=sample, shift=shift,
-                           perf_examples=perf_examples, d=d)
 
 
 @app.get("/api/digest")

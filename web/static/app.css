@@ -1,6 +1,6 @@
 /* Creative Monitor — YouTube visual language, editorial discipline.
  *
- * Token intent (see /components for the documented version):
+ * Token intent:
  *   --accent-out   YouTube Red. Marks outperformance. Used NOWHERE else — not the
  *                  logo, not buttons, not chips. If it appears, a creative beat its
  *                  own channel's median.
@@ -38,8 +38,8 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 a { color: inherit; text-decoration: none; }
-a.link, .prose a { color: var(--link); }
-a.link:hover, .prose a:hover { text-decoration: underline; }
+a.link { color: var(--link); }
+a.link:hover { text-decoration: underline; }
 img { display: block; max-width: 100%; }
 .num { font-variant-numeric: tabular-nums; }
 
@@ -298,18 +298,6 @@ h1.title { font-size: 36px; line-height: 44px; font-weight: 700; letter-spacing:
 table.runs { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
 table.runs th, table.runs td { text-align: left; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
 table.runs th { color: var(--ink-2); font-weight: 500; font-size: 12px; }
-.prose { max-width: 820px; font-size: 15px; line-height: 1.6; }
-.prose h1, .prose h2 { letter-spacing: -0.3px; }
-.prose h2 { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); }
-.prose table { border-collapse: collapse; }
-.prose td, .prose th { padding: 6px 12px 6px 0; border-bottom: 1px solid var(--line); text-align: left; }
-.prose code { background: var(--chip); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
-.lib h2 { font-size: 20px; margin: 48px 0 4px; }
-.lib .intent { color: var(--ink-2); max-width: 44em; margin: 0 0 16px; }
-.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 20px; }
-.sw .chipc { height: 56px; border-radius: 10px; border: 1px solid var(--line); }
-.sw b { display: block; margin-top: 8px; font-weight: 500; }
-.sw p { margin: 2px 0 0; color: var(--ink-2); font-size: 13px; }
 
 /* --- responsive -------------------------------------------------------- */
 @media (max-width: 1100px) {

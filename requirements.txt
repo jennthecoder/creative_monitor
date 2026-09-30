@@ -3,5 +3,4 @@ requests
 openai
 python-dotenv
 flask
-markdown
 pytest
