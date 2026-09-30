@@ -1,0 +1,60 @@
+name: Publish site
+
+# Renders the web app to static HTML and publishes it to GitHub Pages.
+# Runs after every daily/weekly data run (their commits use GITHUB_TOKEN, which
+# doesn't trigger push events), and on pushes that change the app or data.
+on:
+  workflow_run:
+    workflows: ["Weekly creative monitor", "Daily stats refresh"]
+    types: [completed]
+  push:
+    branches: [master]
+    paths: ["web/**", "src/**", "config/**", "scripts/**", "data/monitor.db", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master   # workflow_run checks out the triggering commit; the data commit lands after it
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Build static site
+        env:
+          RUBRIC_FILE: ${{ vars.RUBRIC_FILE || 'rubric.podcast.yaml' }}
+        run: python -m scripts.build_site --out site --base "${{ steps.pages.outputs.base_path }}"
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

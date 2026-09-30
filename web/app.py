@@ -2,6 +2,10 @@
 
 Read-only views over the pipeline's state, plus the rubric editor. Every page is
 rendered from src/digest.py, the same builder that produces the Slack digest.
+
+URLs are folder-style with no query strings, so scripts/build_site.py can render
+every page to static HTML for GitHub Pages. With STATIC_SITE=1 the rubric page is
+read-only (there's no server to save to).
 """
 from __future__ import annotations
 
@@ -25,6 +29,9 @@ load_dotenv(ROOT / ".env")
 app = Flask(__name__)
 app.json.sort_keys = False  # rubric dimension order is meaningful
 app.config["TEMPLATES_AUTO_RELOAD"] = True
+app.config["STATIC_SITE"] = os.getenv("STATIC_SITE") == "1"
+FORMATS = ("all",) + BUCKETS
+SORTS = ("newest", "best", "weakest")
 NAME_RE = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
 
 
@@ -33,7 +40,7 @@ def _conn():
 
 
 def _week_end(arg: str | None) -> datetime:
-    """?week=YYYY-MM-DD names the last day of the digest week; default is now."""
+    """/week/YYYY-MM-DD/ names the last day of the digest week; default is now."""
     now = datetime.now(timezone.utc)
     if not arg:
         return now
@@ -72,6 +79,7 @@ def _globals():
         "nav_brands": [{"name": b["name"], "slug": digest.slug(b["name"])} for b in load_brands()],
         "last_run": dict(run) if run else None,
         "path": request.path,
+        "static_site": app.config["STATIC_SITE"],
         "initials": _initials,
     }
 
@@ -86,29 +94,43 @@ def _dt(value, fmt="%d %b %Y"):
 # --- pages ----------------------------------------------------------------
 
 @app.get("/")
-def digest_page():
-    end = _week_end(request.args.get("week"))
-    d = digest.build(_conn(), load_rubric(), load_brands(), end)
+@app.get("/week/<week>/")
+def digest_page(week=None):
+    end = _week_end(week)
+    conn = _conn()
+    d = digest.build(conn, load_rubric(), load_brands(), end)
     now = datetime.now(timezone.utc)
-    prev_week = (end - timedelta(days=7)).date().isoformat()
-    next_week = (end + timedelta(days=7)).date().isoformat() if end + timedelta(days=1) < now else None
+    # Navigation stops at the first week with data, so the site has a finite set of pages.
+    first = conn.execute("SELECT MIN(published_at) FROM videos").fetchone()[0]
+    prev_end = end - timedelta(days=7)
+    prev_url = (url_for("digest_page", week=prev_end.date().isoformat())
+                if first and prev_end >= datetime.fromisoformat(first.replace("Z", "+00:00"))
+                else None)
     is_current = (now - end) < timedelta(days=1)
-    return render_template("digest.html", d=d, prev_week=prev_week, next_week=next_week,
+    next_url = None
+    if not is_current:
+        nxt = end + timedelta(days=7)
+        next_url = (url_for("digest_page") if nxt + timedelta(days=1) >= now
+                    else url_for("digest_page", week=nxt.date().isoformat()))
+    return render_template("digest.html", d=d, prev_url=prev_url, next_url=next_url,
                            is_current=is_current)
 
 
-@app.get("/channel/<slug>")
-def brand_page(slug):
+@app.get("/channel/<slug>/", defaults={"fmt": "all", "sort": "newest"})
+@app.get("/channel/<slug>/<fmt>/<sort>/")
+def brand_page(slug, fmt, sort):
     b = _brand(slug)
+    if fmt not in FORMATS or sort not in SORTS:
+        abort(404)
+    fmt = None if fmt == "all" else fmt
+    sort = None if sort == "newest" else sort
     conn, rubric = _conn(), load_rubric()
     now = datetime.now(timezone.utc)
     scores = score_brand(conn, b["name"], now)
     videos = digest.brand_videos(conn, b["name"])
-    fmt = request.args.get("format")
     cards = [digest.card(v, scores, rubric, now) for v in videos]
-    if fmt in BUCKETS:
+    if fmt:
         cards = [c for c in cards if c["bucket"] == fmt]
-    sort = request.args.get("sort") if request.args.get("sort") in ("best", "weakest") else None
     if sort:
         # Judged videos only: an under-7-day index is still moving.
         cards = sorted([c for c in cards if c["index"] is not None and not c["too_early"]],
@@ -130,7 +152,7 @@ def brand_page(slug):
         trend=digest.publishing_trend(videos, now - timedelta(days=7)))
 
 
-@app.get("/video/<video_id>")
+@app.get("/video/<video_id>/")
 def video_page(video_id):
     conn, rubric = _conn(), load_rubric()
     v = store.get_video(conn, video_id)
@@ -154,7 +176,7 @@ def video_page(video_id):
                            rubric_matches=(c["rubric_version"] in (None, rubric["version"])))
 
 
-@app.get("/rubric")
+@app.get("/rubric/")
 def rubric_page():
     path = _rubric_path()
     r = load_rubric(path)
@@ -165,8 +187,10 @@ def rubric_page():
                            counts=counts, saved=request.args.get("saved"))
 
 
-@app.post("/rubric")
+@app.post("/rubric/")
 def rubric_save():
+    if app.config["STATIC_SITE"]:
+        abort(405)
     try:
         dims = json.loads(request.form["dimensions"])
         clean = validate_rubric(dims)

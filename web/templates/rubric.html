@@ -7,10 +7,10 @@
   <h1 class="title">What the system measures</h1>
   <p class="rub-intro">This rubric is data, not code. Every video is tagged with exactly one value per
     dimension below, and the digest compares those tags week over week. Point the monitor at a
-    different industry by editing this page — nothing in the pipeline changes.</p>
+    different industry by {{ 'editing the rubric file in config/' if static_site else 'editing this page' }} — nothing in the pipeline changes.</p>
 
   <div class="rub-file meta">
-    <span>Editing</span>
+    <span>{{ 'Active rubric' if static_site else 'Editing' }}</span>
     {% for f in others %}<span class="chip {{ 'on' if f == file }}" title="{{ 'Active (RUBRIC_FILE)' if f == file else 'Switch with RUBRIC_FILE in .env' }}">{{ f }}</span>{% endfor %}
     <span class="num">· version {{ rubric.version }}</span>
   </div>
@@ -20,6 +20,17 @@
   {% if error %}<div class="err"><b>Couldn’t save:</b> {{ error }}</div>{% endif %}
   {% if counts %}<p class="meta num">Tagged so far: {% for v, n in counts.items() %}{{ n }} video{{ 's' if n != 1 }} with version {{ v }}{{ ', ' if not loop.last }}{% endfor %}.</p>{% endif %}
 
+  {% if static_site %}
+  {# Published site: no server to save to, so the rubric is shown read-only. #}
+  {% for name, values in rubric.dimensions.items() %}
+  <div class="dim">
+    <div><b class="name">{{ name | replace('_', ' ') | capitalize }}</b>
+      <div class="hint">{{ values | length }} allowed value{{ 's' if values | length != 1 }}</div></div>
+    <div class="vals">{% for v in values %}<span class="val" style="padding-right:12px">{{ v | replace('_', ' ') }}</span>{% endfor %}</div>
+  </div>
+  {% endfor %}
+  <p class="meta" style="margin-top:24px">To change it, run the app locally (<code>python dashboard.py</code>) and edit it there, or edit <code>config/{{ file }}</code>, then commit. The site updates on the next build.</p>
+  {% else %}
   <form method="post" id="rubric-form">
     <div id="dims"></div>
     <button type="button" class="btn" id="add-dim" style="margin-top:16px">
@@ -31,10 +42,12 @@
       <span class="meta" id="status">No unsaved changes</span>
     </div>
   </form>
+  {% endif %}
 </div>
 {% endblock %}
 
 {% block scripts %}
+{% if not static_site %}
 <script>
 (function () {
   const initial = {{ rubric.dimensions | tojson }};
@@ -107,4 +120,5 @@
   render();
 })();
 </script>
+{% endif %}
 {% endblock %}

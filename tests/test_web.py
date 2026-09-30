@@ -58,16 +58,18 @@ def _load(path):
 
 
 def test_every_page_renders(client):
-    for url in ["/", "/?week=2026-09-01", "/channel/the-test-channel",
-                "/channel/the-test-channel?format=short", "/video/vid0", "/video/vid1",
-                "/rubric", "/api/digest"]:
+    week = (NOW - timedelta(days=7)).date().isoformat()
+    for url in ["/", f"/week/{week}/", "/channel/the-test-channel/",
+                "/channel/the-test-channel/short/newest/", "/channel/the-test-channel/all/best/",
+                "/video/vid0/", "/video/vid1/", "/rubric/", "/api/digest"]:
         assert client.get(url).status_code == 200, url
 
 
 def test_unknown_things_404(client):
-    assert client.get("/channel/nope").status_code == 404
-    assert client.get("/video/nope").status_code == 404
-    assert client.get("/?week=not-a-date").status_code == 400
+    assert client.get("/channel/nope/").status_code == 404
+    assert client.get("/channel/the-test-channel/reels/best/").status_code == 404
+    assert client.get("/video/nope/").status_code == 404
+    assert client.get("/week/not-a-date/").status_code == 400
 
 
 def test_digest_page_marks_outperformer_with_accent_only(client):
@@ -77,9 +79,9 @@ def test_digest_page_marks_outperformer_with_accent_only(client):
 
 
 def test_video_page_theme_cluster_and_comments_off(client):
-    html = client.get("/video/vid0").get_data(as_text=True)
+    html = client.get("/video/vid0/").get_data(as_text=True)
     assert "Objections" in html and "price" in html
-    html = client.get("/video/vid1").get_data(as_text=True)
+    html = client.get("/video/vid1/").get_data(as_text=True)
     assert "Comments are turned off on this video" in html
 
 
@@ -96,7 +98,7 @@ def test_rubric_save_bumps_version_and_keeps_order(client):
     dims = {k: v["values"] for k, v in before["dimensions"].items()}
     dims["offer"].append("Free Gift")          # normalised to free_gift
     dims["music"] = ["licensed", "original"]   # new dimension goes last
-    r = client.post("/rubric", data={"dimensions": json.dumps(dims)})
+    r = client.post("/rubric/", data={"dimensions": json.dumps(dims)})
     assert r.status_code == 302
     after = yaml.safe_load((client.cfg / "rubric.yaml").read_text())
     assert after["version"] == "2"
@@ -108,7 +110,7 @@ def test_rubric_save_bumps_version_and_keeps_order(client):
 def test_rubric_unchanged_save_does_not_bump(client):
     before = (client.cfg / "rubric.yaml").read_text()
     dims = {k: v["values"] for k, v in yaml.safe_load(before)["dimensions"].items()}
-    client.post("/rubric", data={"dimensions": json.dumps(dims)})
+    client.post("/rubric/", data={"dimensions": json.dumps(dims)})
     assert (client.cfg / "rubric.yaml").read_text() == before
 
 
@@ -121,7 +123,7 @@ def test_rubric_unchanged_save_does_not_bump(client):
 ])
 def test_rubric_validation_rejects_and_keeps_file(client, dims, msg):
     before = (client.cfg / "rubric.yaml").read_text()
-    r = client.post("/rubric", data={"dimensions": json.dumps(dims)})
+    r = client.post("/rubric/", data={"dimensions": json.dumps(dims)})
     assert r.status_code == 400 and msg in r.get_data(as_text=True)
     assert (client.cfg / "rubric.yaml").read_text() == before
     if "<script>" in json.dumps(dims):  # rejected input is echoed escaped, never raw
@@ -140,3 +142,32 @@ def test_format_helpers():
     assert digest.bar_position(1.0) == 0.5 and digest.bar_position(100) == 1.0
     assert digest.perf_class(1.5) == "out" and digest.perf_class(1.2) == "above"
     assert digest.perf_class(0.8) == "below" and digest.perf_class(0.5) == "under"
+
+
+def test_week_navigation_stops_at_first_week_with_data(client):
+    html = client.get("/").get_data(as_text=True)
+    assert 'aria-label="Previous week"' in html  # data goes back 16 days
+    old = (NOW - timedelta(days=21)).date().isoformat()
+    html = client.get(f"/week/{old}/").get_data(as_text=True)
+    assert 'aria-label="Previous week"' not in html
+    assert 'aria-label="Next week"' in html
+
+
+def test_static_build_publishes_every_linked_page(client, tmp_path, monkeypatch):
+    from scripts import build_site
+    monkeypatch.setitem(webapp.app.config, "STATIC_SITE", True)
+    out = tmp_path / "site"
+    assert build_site.build(out, "/creative_monitor") == 0
+    assert (out / "index.html").exists() and (out / ".nojekyll").exists()
+    assert (out / "static" / "app.css").exists()
+    assert (out / "channel" / "the-test-channel" / "short" / "best" / "index.html").exists()
+    assert (out / "video" / "vid0" / "index.html").exists()
+    home = (out / "index.html").read_text()
+    assert 'href="/creative_monitor/channel/the-test-channel/"' in home
+    rubric = (out / "rubric" / "index.html").read_text()
+    assert "<form" not in rubric and "Hook type" in rubric
+
+
+def test_rubric_is_read_only_on_static_site(client, monkeypatch):
+    monkeypatch.setitem(webapp.app.config, "STATIC_SITE", True)
+    assert client.post("/rubric/", data={"dimensions": "{}"}).status_code == 405

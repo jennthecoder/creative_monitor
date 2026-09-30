@@ -4,10 +4,11 @@
 
 {% block weeknav %}
 <nav class="weeknav" aria-label="Week">
-  <a href="{{ url_for('digest_page', week=prev_week) }}" aria-label="Previous week">
+  {% if prev_url %}<a href="{{ prev_url }}" aria-label="Previous week">
     <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4L10.8 12z"/></svg></a>
+  {% else %}<span class="off" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4L10.8 12z"/></svg></span>{% endif %}
   <span class="label"><span class="long">{{ d.week_start | dt('%d %b') }} – {{ d.week_end | dt('%d %b %Y') }}</span><span class="short">{{ d.week_start | dt('%d %b') }} – {{ d.week_end | dt('%d %b') }}</span></span>
-  {% if next_week %}<a href="{{ url_for('digest_page', week=next_week) }}" aria-label="Next week">
+  {% if next_url %}<a href="{{ next_url }}" aria-label="Next week">
     <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10 6 8.6 7.4l4.6 4.6-4.6 4.6L10 18l6-6z"/></svg></a>
   {% else %}<span class="off" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10 6 8.6 7.4l4.6 4.6-4.6 4.6L10 18l6-6z"/></svg></span>{% endif %}
 </nav>

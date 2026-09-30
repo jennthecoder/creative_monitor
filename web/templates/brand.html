@@ -29,15 +29,15 @@
   <h2 class="sh">Videos</h2>
   <div class="toolbar">
     <div class="chips" role="navigation" aria-label="Filter by format">
-      <a class="chip {{ 'on' if not fmt }}" href="{{ url_for('brand_page', slug=slug, sort=sort) }}">All</a>
+      <a class="chip {{ 'on' if not fmt }}" href="{{ url_for('brand_page', slug=slug, fmt='all', sort=sort or 'newest') }}">All</a>
       {% for k in ['short', 'clip', 'episode'] if counts[k] %}
-      <a class="chip {{ 'on' if fmt == k }}" href="{{ url_for('brand_page', slug=slug, format=k, sort=sort) }}">{{ bucket_names[k] | capitalize }}</a>
+      <a class="chip {{ 'on' if fmt == k }}" href="{{ url_for('brand_page', slug=slug, fmt=k, sort=sort or 'newest') }}">{{ bucket_names[k] | capitalize }}</a>
       {% endfor %}
     </div>
     <div class="seg" role="navigation" aria-label="Sort">
-      <a class="{{ 'on' if not sort }}" href="{{ url_for('brand_page', slug=slug, format=fmt) }}">Newest</a>
-      <a class="{{ 'on' if sort == 'best' }}" href="{{ url_for('brand_page', slug=slug, format=fmt, sort='best') }}">Best</a>
-      <a class="{{ 'on' if sort == 'weakest' }}" href="{{ url_for('brand_page', slug=slug, format=fmt, sort='weakest') }}">Weakest</a>
+      <a class="{{ 'on' if not sort }}" href="{{ url_for('brand_page', slug=slug, fmt=fmt or 'all', sort='newest') }}">Newest</a>
+      <a class="{{ 'on' if sort == 'best' }}" href="{{ url_for('brand_page', slug=slug, fmt=fmt or 'all', sort='best') }}">Best</a>
+      <a class="{{ 'on' if sort == 'weakest' }}" href="{{ url_for('brand_page', slug=slug, fmt=fmt or 'all', sort='weakest') }}">Weakest</a>
     </div>
   </div>
 
