@@ -1,0 +1,50 @@
+name: Weekly creative monitor
+
+on:
+  schedule:
+    - cron: "0 13 * * 1"   # Mondays 13:00 UTC (9am ET)
+  workflow_dispatch:
+
+permissions:
+  contents: write   # commit data/monitor.db back to the repo
+
+concurrency:
+  group: creative-monitor
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Run monitor
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: python -m src.main
+
+      - name: Commit updated state
+        run: |
+          git config user.name "creative-monitor-bot"
+          git config user.email "creative-monitor-bot@users.noreply.github.com"
+          git add data/monitor.db reports/
+          git diff --cached --quiet || git commit -m "Weekly run $(date -u +%F)"
+          git push
+
+      - name: Upload digest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest
+          path: reports/digest-*.md
+          if-no-files-found: warn

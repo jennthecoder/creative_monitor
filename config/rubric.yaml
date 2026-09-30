@@ -1,0 +1,19 @@
+# Creative classification rubric. Every dimension has a fixed list of allowed values.
+# Bump `version` whenever values change so old classifications stay interpretable.
+version: "1"
+dimensions:
+  hook_type:
+    values: [problem, question, bold_claim, social_proof, demo, before_after,
+             founder_story, unboxing, other]
+  format:
+    values: [ugc, talking_head, studio_product, testimonial, listicle,
+             montage, animation, other]
+  angle:
+    values: [price_value, quality_durability, convenience, health,
+             aesthetic_status, sustainability, problem_solution, other]
+  offer:
+    values: [discount, bundle, free_shipping, limited_time, none]
+  production_level:
+    values: [low, mid, high]
+  thumbnail_treatment:
+    values: [face, product_only, text_overlay, before_after, lifestyle_scene, other]

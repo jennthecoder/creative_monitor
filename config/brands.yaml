@@ -1,0 +1,7 @@
+# Channels to monitor. channel_id is the YouTube channel ID (starts with "UC").
+# Placeholders below — replace with real competitor channels.
+brands:
+  - name: Brand A
+    channel_id: UC_REPLACE_ME_A
+  - name: Brand B
+    channel_id: UC_REPLACE_ME_B

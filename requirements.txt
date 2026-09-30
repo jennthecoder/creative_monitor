@@ -1,0 +1,7 @@
+pyyaml
+requests
+anthropic
+python-dotenv
+flask
+markdown
+pytest
