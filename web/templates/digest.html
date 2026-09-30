@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui %}
+{% block title %}Week of {{ d.week_start | dt('%d %b') }} · Creative Monitor{% endblock %}
+
+{% block weeknav %}
+<nav class="weeknav" aria-label="Week">
+  <a href="{{ url_for('digest_page', week=prev_week) }}" aria-label="Previous week">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M15.4 7.4 14 6l-6 6 6 6 1.4-1.4L10.8 12z"/></svg></a>
+  <span class="label"><span class="long">{{ d.week_start | dt('%d %b') }} – {{ d.week_end | dt('%d %b %Y') }}</span><span class="short">{{ d.week_start | dt('%d %b') }} – {{ d.week_end | dt('%d %b') }}</span></span>
+  {% if next_week %}<a href="{{ url_for('digest_page', week=next_week) }}" aria-label="Next week">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10 6 8.6 7.4l4.6 4.6-4.6 4.6L10 18l6-6z"/></svg></a>
+  {% else %}<span class="off" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M10 6 8.6 7.4l4.6 4.6-4.6 4.6L10 18l6-6z"/></svg></span>{% endif %}
+</nav>
+{% endblock %}
+
+{% block main %}
+<div class="page">
+  {{ ui.run_banner(d.last_run) if is_current }}
+
+  <div class="chips" role="navigation" aria-label="Jump to channel">
+    <a class="chip on" href="#top">All</a>
+    {% for b in d.brands %}<a class="chip" href="#{{ b.slug }}">{{ b.name }}</a>{% endfor %}
+  </div>
+
+  <div id="top" class="eyebrow">Weekly digest</div>
+  <h1 class="title">Week of {{ d.week_start | dt('%d %B') }}</h1>
+  <p class="headline">{{ d.headline }}</p>
+  <p class="meta num">{{ d.total_new }} new creative{{ 's' if d.total_new != 1 }} across {{ d.brands | length }} channel{{ 's' if d.brands | length != 1 }}
+    · every “x” compares a video with its own channel’s median for the same format
+    {% if not is_current %}· <span title="Metrics are stored per run; past weeks are re-scored with the latest counts">views as of the latest run</span>{% endif %}
+    · <a class="link" href="{{ url_for('digest_page', week=prev_week) }}">Previous week</a></p>
+
+  {% for b in d.brands %}
+  <section class="brand" id="{{ b.slug }}">
+    <div class="brand-head">
+      <span class="avatar lg">{{ initials(b.name) }}</span>
+      <h2><a href="{{ url_for('brand_page', slug=b.slug) }}">{{ b.name }}</a></h2>
+      <span class="count num">{{ b.new_count }} new{% if b.mix %} · {% for k, n in b.mix %}{{ n }} {{ k }}{{ ', ' if not loop.last }}{% endfor %}{% endif %}</span>
+      {{ ui.trend(b.trend) }}
+    </div>
+
+    {% if b.shift %}{{ ui.shift(b.shift) }}{% endif %}
+
+    {% if b.verdicts %}
+    <div class="subhead">Now judgeable <span class="note">crossed 7 days old this week</span></div>
+    {% for c in b.verdicts %}{{ ui.card(c) }}{% endfor %}
+    {% endif %}
+
+    {% if b.winners %}
+    <ul class="working">
+      {% for attr, idx, n in b.winners %}
+      <li><b>What’s working:</b> {{ attr }} videos run at <span class="num">{{ '%.1f' | format(idx) }}x</span> their format median across {{ n }} videos.</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if b.leaders %}
+    <div class="subhead">Just launched <span class="note">under 7 days — early signal only</span></div>
+    {% if b.launched_pattern %}<p class="pattern">Mostly {{ b.launched_pattern }}.</p>{% endif %}
+    <div class="grid">{% for c in b.leaders %}{{ ui.tile(c) }}{% endfor %}</div>
+    {% if b.launched_more %}<a class="more link" href="{{ url_for('brand_page', slug=b.slug) }}">See all {{ b.new_count }} from this week</a>{% endif %}
+    {% endif %}
+
+    {% if b.quiet %}
+    <div class="quiet">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 16H5V5h14zM7 10h2v7H7zm4-3h2v10h-2zm4 6h2v4h-2z" opacity=".6"/></svg>
+      <div><b style="color:var(--ink);font-weight:500">No new creatives this week.</b><br>
+      {% if b.trend.usual %}This channel usually posts about {{ b.trend.usual }} a week.{% else %}Nothing crossed the 7-day mark either.{% endif %}</div>
+    </div>
+    {% endif %}
+
+    {% if b.comments_off %}
+    <div class="note-off"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.99 4A2 2 0 0 0 20 2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14l4 4z"/></svg>Comments are turned off on this channel’s recent videos, so there are no audience themes.</div>
+    {% endif %}
+    {% if not b.has_baseline %}<div class="note-off">No baseline yet — this channel needs videos at least 7 days old.</div>{% endif %}
+  </section>
+  {% endfor %}
+
+  {{ ui.flags(d.flags) }}
+</div>
+{% endblock %}

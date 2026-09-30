@@ -76,9 +76,9 @@ def test_parse_duration():
 
 def test_second_run_processes_zero(tmp_path):
     conn, fake, client = make(tmp_path)
-    r1 = fetch.run_fetch(conn, client, BRANDS)
+    r1 = fetch.run_fetch(conn, client, BRANDS, backfill=20)
     assert len(r1.new_videos) == 20  # first-run backfill
-    r2 = fetch.run_fetch(conn, client, BRANDS)
+    r2 = fetch.run_fetch(conn, client, BRANDS, backfill=20)
     assert len(r2.new_videos) == 0
     assert conn.execute("SELECT COUNT(*) FROM videos").fetchone()[0] == 20
     # Same-day rerun doesn't duplicate metrics rows.
@@ -87,36 +87,36 @@ def test_second_run_processes_zero(tmp_path):
 
 def test_new_upload_is_picked_up(tmp_path):
     conn, fake, client = make(tmp_path)
-    fetch.run_fetch(conn, client, BRANDS)
+    fetch.run_fetch(conn, client, BRANDS, backfill=20)
     fake.add_upload("fresh", "2026-09-29T12:00:00Z")
-    r = fetch.run_fetch(conn, client, BRANDS)
+    r = fetch.run_fetch(conn, client, BRANDS, backfill=20)
     assert list(r.new_videos) == ["fresh"]
 
 
 def test_uploads_playlist_cached(tmp_path):
     conn, fake, client = make(tmp_path)
-    fetch.run_fetch(conn, client, BRANDS)
-    fetch.run_fetch(conn, client, BRANDS)
+    fetch.run_fetch(conn, client, BRANDS, backfill=20)
+    fetch.run_fetch(conn, client, BRANDS, backfill=20)
     assert store.get_uploads_playlist(conn, "UCaaa") == "UU1"
 
 
 def test_overflow_is_capped_and_deferred(tmp_path):
     conn, fake, client = make(tmp_path)
-    fetch.run_fetch(conn, client, BRANDS)
+    fetch.run_fetch(conn, client, BRANDS, backfill=20)
     for i in range(10):
         fake.add_upload(f"burst{i}", f"2026-09-30T{i:02d}:00:00Z")
-    r = fetch.run_fetch(conn, client, BRANDS, per_run_cap=4)
+    r = fetch.run_fetch(conn, client, BRANDS, per_run_cap=4, backfill=20)
     assert len(r.new_videos) == 4 and r.overflow == {"Brand A": 6}
-    r = fetch.run_fetch(conn, client, BRANDS, per_run_cap=4)
+    r = fetch.run_fetch(conn, client, BRANDS, per_run_cap=4, backfill=20)
     assert len(r.new_videos) == 4
-    r = fetch.run_fetch(conn, client, BRANDS, per_run_cap=4)
+    r = fetch.run_fetch(conn, client, BRANDS, per_run_cap=4, backfill=20)
     assert len(r.new_videos) == 2 and not r.overflow
 
 
 def test_quota_exhaustion_leaves_state_untouched(tmp_path):
     conn, fake, client = make(tmp_path, quota_after=3)
     with pytest.raises(fetch.QuotaExceeded):
-        fetch.run_fetch(conn, client, BRANDS + [{"name": "Brand B", "channel_id": "UCbbb"}])
+        fetch.run_fetch(conn, client, BRANDS + [{"name": "Brand B", "channel_id": "UCbbb"}], backfill=20)
     conn.rollback()
     assert conn.execute("SELECT COUNT(*) FROM videos").fetchone()[0] == 0
     assert conn.execute("SELECT COUNT(*) FROM metrics").fetchone()[0] == 0
@@ -126,3 +126,12 @@ def test_comments_disabled_returns_none(tmp_path):
     conn, fake, client = make(tmp_path, comments_disabled={"v001"})
     assert fetch.fetch_comments(client, "v001") is None
     assert fetch.fetch_comments(client, "v002") == ["love it"]  # text only, no author
+
+
+def test_raising_backfill_tops_up_existing_brand(tmp_path):
+    conn, fake, client = make(tmp_path)
+    assert len(fetch.run_fetch(conn, client, BRANDS, backfill=10).new_videos) == 10
+    r = fetch.run_fetch(conn, client, BRANDS, backfill=25)
+    assert len(r.new_videos) == 15  # the next-oldest 15, none duplicated
+    assert len(fetch.run_fetch(conn, client, BRANDS, backfill=25).new_videos) == 0
+    assert conn.execute("SELECT COUNT(DISTINCT video_id) FROM videos").fetchone()[0] == 25

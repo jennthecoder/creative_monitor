@@ -105,10 +105,11 @@ def uploads_playlist_id(client: YouTubeClient, conn, brand: dict) -> str:
 
 
 def scan_new_video_ids(client: YouTubeClient, conn, playlist_id: str, since: str | None,
-                       max_scan: int) -> list[tuple[str, str]]:
+                       max_scan: int, stop_at_known: bool = True) -> list[tuple[str, str]]:
     """Step 2+3. Walk the uploads playlist newest-first and return unknown
     (video_id, published_at) pairs. Stops at the first known video, at anything
-    published before `since`, or after `max_scan` items."""
+    published before `since`, or after `max_scan` items. With stop_at_known=False
+    (backfill top-up) known videos are skipped instead of ending the scan."""
     found: list[tuple[str, str]] = []
     scanned, page = 0, None
     while scanned < max_scan:
@@ -123,6 +124,8 @@ def scan_new_video_ids(client: YouTubeClient, conn, playlist_id: str, since: str
             vid = it["contentDetails"]["videoId"]
             pub = it["contentDetails"].get("videoPublishedAt") or ""
             scanned += 1
+            if vid in known and not stop_at_known:
+                continue
             if vid in known or (since and pub and pub < since):
                 return found
             found.append((vid, pub))
@@ -198,8 +201,8 @@ class FetchResult:
 
 
 def run_fetch(conn, client: YouTubeClient, brands: list[dict], *, per_run_cap: int = 25,
-              first_run_backfill: int = 20, max_scan: int = 100,
-              refresh_recent: int = 20) -> FetchResult:
+              backfill: int = 100, max_scan: int = 100,
+              refresh_recent: int = 100) -> FetchResult:
     """Fetch everything into memory first, then persist in one transaction.
     Any YouTubeError propagates before a single row is written."""
     result = FetchResult()
@@ -210,17 +213,20 @@ def run_fetch(conn, client: YouTubeClient, brands: list[dict], *, per_run_cap: i
         name = brand["name"]
         playlists[name] = uploads_playlist_id(client, conn, brand)
         since = store.latest_published_at(conn, name)
-        candidates = scan_new_video_ids(client, conn, playlists[name], since, max_scan)
-
-        if since is None:
-            # First run: take the newest N so there is a baseline to compare against.
-            chosen = candidates[:first_run_backfill]
+        topping_up = store.video_count(conn, name) < backfill
+        if topping_up:
+            # First run, or backfill raised: fill in the newest N so there is a
+            # baseline. Known videos are skipped, so this is rerun-safe.
+            candidates = scan_new_video_ids(client, conn, playlists[name], None, backfill,
+                                            stop_at_known=False)
+            chosen = candidates
         else:
+            candidates = scan_new_video_ids(client, conn, playlists[name], since, max_scan)
             # Later runs: oldest-first, so deferred ones are picked up next run.
             candidates.sort(key=lambda x: x[1])
             chosen = candidates[:per_run_cap]
         deferred = len(candidates) - len(chosen)
-        if deferred > 0 and since is not None:
+        if deferred > 0 and not topping_up:
             result.overflow[name] = deferred
             log.warning("%s: %d new uploads exceed cap of %d; deferring %d to next run",
                         name, len(candidates), per_run_cap, deferred)

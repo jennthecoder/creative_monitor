@@ -1,6 +1,6 @@
 pyyaml
 requests
-anthropic
+openai
 python-dotenv
 flask
 markdown

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Run history · Creative Monitor{% endblock %}
+{% block main %}
+<div class="page">
+  <div class="eyebrow" style="margin-top:16px">Pipeline</div>
+  <h1 class="title">Run history</h1>
+  <p class="meta">Each run fetches new uploads, tags them, refreshes view counts and writes the digest. A failed run saves nothing, so the next one picks up where it left off.</p>
+  {% if runs %}
+  <table class="runs" style="margin-top:24px">
+    <tr><th>#</th><th>Started (UTC)</th><th>New</th><th>Tagged</th><th>Errors</th><th>Status</th><th>Note</th></tr>
+    {% for r in runs %}
+    <tr><td>{{ r.run_id }}</td><td>{{ r.started_at | dt('%d %b %Y, %H:%M') }}</td><td>{{ r.videos_found if r.videos_found is not none else '—' }}</td>
+      <td>{{ r.videos_classified if r.videos_classified is not none else '—' }}</td><td>{{ r.errors if r.errors is not none else '—' }}</td>
+      <td><span class="runpill" style="display:inline-flex"><span class="dot {{ 'ok' if r.status == 'ok' else 'warn' if r.status == 'ok_with_errors' else 'fail' if r.status == 'failed' else '' }}"></span>{{ (r.status or '').replace('_', ' ') }}</span></td>
+      <td style="color:var(--ink-2)">{{ r.message }}</td></tr>
+    {% endfor %}
+  </table>
+  {% else %}<div class="quiet">No runs yet. Run <code>python -m src.main</code> to fetch the first batch.</div>{% endif %}
+</div>
+{% endblock %}

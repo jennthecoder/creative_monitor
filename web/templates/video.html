@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui %}
+{% block title %}{{ c.title }} · Creative Monitor{% endblock %}
+
+{% block main %}
+<div class="page wide">
+  <div class="watch">
+    <div>
+      <a class="player" href="{{ c.url }}" target="_blank" rel="noopener">
+        <img src="{{ c.thumb_large }}" data-fallback="{{ c.thumb }}" alt="Thumbnail for {{ c.title }}">
+        <span class="play"><span><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Watch on YouTube</span></span>
+      </a>
+      <h1>{{ c.title }}</h1>
+      <div class="owner">
+        <span class="avatar lg">{{ initials(c.brand) }}</span>
+        <div><a href="{{ url_for('brand_page', slug=c.brand_slug) }}"><b>{{ c.brand }}</b></a>
+          <div class="meta">{{ c.bucket_singular | capitalize if c.bucket_singular }}{{ ' · ' ~ c.duration if c.duration }}</div></div>
+      </div>
+
+      <div class="desc">
+        <div class="meta num">{{ '{:,}'.format(c.views) if c.views is not none else '—' }} views · {{ c.published_at | dt('%d %b %Y') }} · {{ c.ago }}</div>
+        {% if c.index is not none %}
+        {{ ui.perf(c, 'lg') }}
+        <div class="meta num" style="font-weight:400;color:var(--ink-2)">Channel median for {{ c.bucket_singular }}s: {{ baseline }} views{% if c.too_early %} · under 7 days old, so this number is still moving{% endif %}</div>
+        {% else %}
+        <p class="meta" style="font-weight:400;color:var(--ink-2)">No baseline yet for this channel’s {{ c.bucket_singular }}s.</p>
+        {% endif %}
+
+        <dl class="num">
+          <dt>Engagement</dt><dd>{{ c.engagement_text }}{{ ' (likes + comments ÷ views)' if c.engagement is not none }}</dd>
+          {% if c.classified %}
+          {% for ch in c.chips %}<dt>{{ ch.dim }}</dt><dd>{{ ch.value }}</dd>{% endfor %}
+          <dt>Confidence</dt><dd>{{ c.confidence }}</dd>
+          {% endif %}
+        </dl>
+        {% if c.rationale %}<p class="rationale"><b>Why it was tagged this way:</b> {{ c.rationale }}</p>{% endif %}
+        {{ ui.lowconf(c) }}
+        {% if quarantine %}<p class="lowconf">Set aside — couldn’t be classified: {{ quarantine }}</p>{% endif %}
+        {% if c.rubric_version and not rubric_matches %}<p class="meta" style="font-weight:400;color:var(--ink-2)">Tagged with rubric version {{ c.rubric_version }}, which differs from the current rubric.</p>
+        {% elif c.rubric_version %}<p class="meta" style="font-weight:400;color:var(--ink-3);font-size:12px">Rubric {{ c.rubric_version }}</p>{% endif %}
+      </div>
+
+      {{ ui.themes(c.themes, c.comments_off) }}
+
+      {% if history | length > 1 %}
+      <section class="themes">
+        <h2>Measurements</h2>
+        <table class="runs"><tr><th>Measured</th><th>Views</th><th>Likes</th><th>Comments</th></tr>
+        {% for h in history %}<tr><td>{{ h.measured_at }}</td><td>{{ '{:,}'.format(h.views) if h.views is not none }}</td><td>{{ '{:,}'.format(h.likes) if h.likes is not none else 'hidden' }}</td><td>{{ '{:,}'.format(h.comment_count) if h.comment_count is not none else 'off' }}</td></tr>{% endfor %}
+        </table>
+      </section>
+      {% endif %}
+    </div>
+
+    <aside class="side-list">
+      <div class="subhead" style="margin-top:0">More from {{ c.brand }}</div>
+      {% for m in more %}
+      <article class="card">
+        {{ ui.thumb(m) }}
+        <div class="body">
+          <h3><a href="{{ url_for('video_page', video_id=m.video_id) }}">{{ m.title }}</a></h3>
+          <div class="meta num">{{ m.views_text }} views · {{ m.ago }}</div>
+          {{ ui.perf(m) }}
+        </div>
+      </article>
+      {% endfor %}
+    </aside>
+  </div>
+</div>
+{% endblock %}

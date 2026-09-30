@@ -29,36 +29,38 @@ def test_slack_post(monkeypatch):
     assert sent == [{"text": "*hi*"}]
 
 
-class SmartClaude:
-    """Answers classification or synthesis based on the system prompt."""
+class SmartLLM:
+    """Answers classification or synthesis based on the system prompt (OpenAI shape)."""
 
     def __init__(self, fail_ids=()):
         self.fail_ids, self.calls = set(fail_ids), 0
-        self.beta = SimpleNamespace(messages=SimpleNamespace(create=self._create))
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._create))
 
-    def _create(self, system, messages, **kw):
+    def _create(self, messages, **kw):
         self.calls += 1
-        c = messages[0]["content"]
-        text = c if isinstance(c, str) else " ".join(b.get("text", "") for b in c)
+        system = messages[0]["content"]
+        text = " ".join(p.get("text", "") for p in messages[1]["content"])
         if "classify" in system:
             body = "broken" if any(f in text for f in self.fail_ids) else json.dumps(GOOD)
         else:
             body = json.dumps(THEMES)
-        return SimpleNamespace(stop_reason="end_turn", content=[SimpleNamespace(type="text", text=body)])
+        msg = SimpleNamespace(content=body, refusal=None)
+        return SimpleNamespace(choices=[SimpleNamespace(message=msg, finish_reason="stop")])
 
 
 @pytest.fixture
 def env(tmp_path, monkeypatch):
     yt = FakeYouTube(comments_disabled={"v012"})
-    claude = SmartClaude(fail_ids={"Title v010"})
+    claude = SmartLLM(fail_ids={"Title v010"})
     db = tmp_path / "m.db"
     monkeypatch.setenv("YOUTUBE_API_KEY", "k")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
+    monkeypatch.setenv("OPENAI_API_KEY", "k")
+    monkeypatch.delenv("RUBRIC_FILE", raising=False)
     monkeypatch.delenv("SLACK_WEBHOOK_URL", raising=False)
-    monkeypatch.setattr(main, "load_dotenv", lambda: None)
+    monkeypatch.setattr(main, "load_dotenv", lambda *a, **k: None)
     monkeypatch.setattr(main.store, "connect", lambda: _connect(db))
     monkeypatch.setattr(main.fetch, "YouTubeClient", lambda key: _yt(key, yt))
-    monkeypatch.setattr(main.anthropic, "Anthropic", lambda: claude)
+    monkeypatch.setattr(main.openai, "OpenAI", lambda: claude)
     monkeypatch.setattr(classify, "fetch_thumbnail", lambda url: None)
     monkeypatch.setattr(deliver, "REPORTS", tmp_path / "reports")
     monkeypatch.setattr(main, "SYNTH_MAX_AGE_DAYS", 10_000)
@@ -81,18 +83,18 @@ def test_end_to_end_and_rerun(env):
     assert main.run() == 0
     conn = _connect(env.db)
     q = lambda sql: conn.execute(sql).fetchone()[0]
-    assert q("SELECT COUNT(*) FROM videos") == 20
-    assert q("SELECT COUNT(*) FROM classifications") == 19      # v010 malformed twice
+    assert q("SELECT COUNT(*) FROM videos") == 30               # whole fake channel (< backfill)
+    assert q("SELECT COUNT(*) FROM classifications") == 29      # v010 malformed twice
     assert q("SELECT COUNT(*) FROM quarantine") == 1
     assert q("SELECT COUNT(*) FROM comment_themes WHERE themes_json IS NULL") == 1  # v012 disabled
     run1 = dict(conn.execute("SELECT * FROM runs ORDER BY run_id DESC").fetchone())
-    assert run1["videos_found"] == 20 and run1["errors"] == 1 and run1["status"] == "ok_with_errors"
+    assert run1["videos_found"] == 30 and run1["errors"] == 1 and run1["status"] == "ok_with_errors"
     assert list((env.tmp / "reports").glob("digest-*.md"))
 
     calls_before = env.claude.calls
     assert main.run() == 0
-    assert q("SELECT COUNT(*) FROM videos") == 20
-    assert q("SELECT COUNT(*) FROM classifications") == 19
+    assert q("SELECT COUNT(*) FROM videos") == 30
+    assert q("SELECT COUNT(*) FROM classifications") == 29
     assert env.claude.calls == calls_before  # nothing re-classified or re-synthesised
     run2 = dict(conn.execute("SELECT * FROM runs ORDER BY run_id DESC").fetchone())
     assert run2["videos_found"] == 0 and run2["errors"] == 0

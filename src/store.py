@@ -139,6 +139,10 @@ def get_video(conn, video_id: str) -> dict | None:
     return dict(row) if row else None
 
 
+def video_count(conn, brand: str) -> int:
+    return conn.execute("SELECT COUNT(*) FROM videos WHERE brand = ?", (brand,)).fetchone()[0]
+
+
 def latest_published_at(conn, brand: str) -> str | None:
     row = conn.execute(
         "SELECT MAX(published_at) AS p FROM videos WHERE brand = ?", (brand,)

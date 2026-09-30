@@ -1,6 +1,7 @@
 """Load brands.yaml and rubric.yaml."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import yaml
@@ -16,8 +17,10 @@ def load_brands(path: Path = CONFIG_DIR / "brands.yaml") -> list[dict]:
     return brands
 
 
-def load_rubric(path: Path = CONFIG_DIR / "rubric.yaml") -> dict:
-    """Returns {"version": str, "dimensions": {name: [allowed values]}}."""
+def load_rubric(path: Path | None = None) -> dict:
+    """Returns {"version": str, "dimensions": {name: [allowed values]}}.
+    Defaults to config/$RUBRIC_FILE (rubric.yaml if unset)."""
+    path = path or CONFIG_DIR / os.getenv("RUBRIC_FILE", "rubric.yaml")
     raw = yaml.safe_load(path.read_text())
     dims = {name: list(spec["values"]) for name, spec in raw["dimensions"].items()}
     return {"version": str(raw.get("version", "1")), "dimensions": dims}

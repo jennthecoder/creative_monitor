@@ -1,0 +1,150 @@
+{# Shared components. Every visual rule from the design spec lives here once. #}
+
+{% macro perf(c, size='') -%}
+{# Index vs the brand's own median for the same format. The 1.0x baseline marker is
+   the concept; accent colour appears only when perf == 'out'. #}
+{% if c.index is not none %}
+<div class="perf {{ c.perf }} {{ 'early' if c.too_early }} {{ size }}"
+     title="{{ c.index_text }} the {{ c.bucket_singular }} median for this channel{{ ' — too early to judge' if c.too_early }}">
+  <span class="fig">{{ c.index_text }}</span>
+  <span>
+    <span class="scale" aria-hidden="true">
+      <span class="track"></span>
+      {% set pos = c.bar * 100 %}
+      {% if pos >= 50 %}<span class="fill" style="left:50%;width:{{ pos - 50 }}%"></span>
+      {% else %}<span class="fill" style="left:{{ pos }}%;width:{{ 50 - pos }}%"></span>{% endif %}
+      <span class="base"></span>
+    </span>
+    <span class="cap">{{ 'early · ' if c.too_early }}vs {{ c.bucket_singular }} median</span>
+  </span>
+</div>
+{% endif %}
+{%- endmacro %}
+
+{% macro chips(c, levers_only=False) -%}
+{# levers_only: just hook / angle / topic, for dense grids. #}
+{% set items = (c.chips | selectattr('key', 'in', ['hook_type', 'angle', 'topic']) | list) if levers_only else c.chips %}
+{% if items %}
+<div class="attrs">{% for ch in items %}<span class="attr"><i>{{ ch.dim }}</i>{{ ch.value }}</span>{% endfor %}</div>
+{% endif %}
+{%- endmacro %}
+
+{% macro lowconf(c) -%}
+{% if c.confidence == 'low' %}
+<div class="lowconf"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-2h2zm0-4h-2V7h2z"/></svg>Low-confidence classification — treat the tags as a guess</div>
+{% endif %}
+{%- endmacro %}
+
+{% macro thumb(c, large=False) -%}
+<a class="thumb" href="{{ url_for('video_page', video_id=c.video_id) }}">
+  {% if large %}<img src="{{ c.thumb_large }}" data-fallback="{{ c.thumb }}" alt="" loading="lazy">
+  {% else %}<img src="{{ c.thumb }}" alt="" loading="lazy">{% endif %}
+  <span class="badge">{{ 'SHORTS' if c.bucket == 'short' else c.duration }}</span>
+</a>
+{%- endmacro %}
+
+{% macro card(c, expanded=False, show_brand=False) -%}
+{# Compact row in the digest; expanded (.x) in channel history. #}
+<article class="card {{ 'x' if expanded }}">
+  {{ thumb(c, large=not expanded) }}
+  <div class="body">
+    {% if c.verdict is defined and c.verdict %}<div class="verdict">{{ c.verdict }}</div>{% endif %}
+    <h3><a href="{{ url_for('video_page', video_id=c.video_id) }}">{{ c.title }}</a></h3>
+    <div class="meta num">{% if show_brand %}{{ c.brand }} · {% endif %}{{ c.views_text }} views · {{ c.ago }}{% if not c.too_early %} · {{ c.engagement_text }}{{ ' engagement' if c.engagement is not none }}{% endif %}</div>
+    {{ perf(c) }}
+    {{ chips(c) }}
+    {% if c.theme_line %}<div class="theme">{{ c.theme_line }}</div>
+    {% elif c.comments_off and expanded %}<div class="theme">Comments are turned off on this video.</div>{% endif %}
+    {% if not c.classified %}<div class="lowconf">Not classified</div>{% endif %}
+    {{ lowconf(c) }}
+  </div>
+</article>
+{%- endmacro %}
+
+{% macro tile(c) -%}
+<article class="tile">
+  {{ thumb(c, large=True) }}
+  <h4><a href="{{ url_for('video_page', video_id=c.video_id) }}">{{ c.title }}</a></h4>
+  <div class="meta num">{{ c.views_text }} views · {{ c.ago }}</div>
+  {% if c.index is not none %}<div class="early">{{ c.index_text }} {{ c.bucket_singular }} median so far · too early to judge</div>{% endif %}
+  {{ chips(c, levers_only=True) }}
+</article>
+{%- endmacro %}
+
+{% macro shift(s) -%}
+<aside class="shift">
+  <span class="tag">Shift</span>
+  <p>{{ s.text }}</p>
+  <div class="dots" aria-hidden="true">
+    <span>{% for i in range(s.window) %}<i class="{{ 'f' if i < s.prior }}"></i>{% endfor %}</span> before
+    <span>{% for i in range(s.window) %}<i class="{{ 'f' if i < s.recent }}"></i>{% endfor %}</span> latest {{ s.window }}
+  </div>
+</aside>
+{%- endmacro %}
+
+{% macro trend(t) -%}
+{% if t.dir %}
+<span class="trend" title="Uploads this week vs the average of recent weeks">
+  {% if t.dir == 'up' %}<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 14l5-5 5 5z"/></svg>Busier than usual
+  {% elif t.dir == 'down' %}<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 10l5 5 5-5z"/></svg>Quieter than usual
+  {% else %}<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 11h12v2H6z"/></svg>About usual{% endif %}
+  <span class="num">({{ t.this }} vs {{ t.usual }}/wk)</span>
+</span>
+{% endif %}
+{%- endmacro %}
+
+{% macro themes(t, comments_off=False) -%}
+<section class="themes">
+  <h2>What viewers are saying</h2>
+  {% if comments_off %}
+    <div class="quiet"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.99 4A2 2 0 0 0 20 2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14l4 4zM3.27 2.27 2 3.54l18.46 18.46 1.27-1.27z" opacity=".5"/></svg>
+    <div><b style="color:var(--ink);font-weight:500">Comments are turned off on this video.</b><br>There’s no audience signal to synthesise, so this creative is judged on views and likes only.</div></div>
+  {% elif not t %}
+    <div class="quiet">No comment themes yet. They’re synthesised for videos from the last three weeks.</div>
+  {% else %}
+    <div class="meta">Synthesised from the top {{ t.comments_analysed or 50 }} comments · overall {{ t.overall_sentiment }} · raw comments and commenter identities are never stored</div>
+    <div class="cluster">
+      <div class="obj"><h3><svg viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2zm12-3h-2v-2h2zm0-4h-2v-4h2z"/></svg>Objections</h3>
+        <ul>{% for x in t.objections %}<li>{{ x }}</li>{% else %}<li class="empty">None recurring</li>{% endfor %}</ul></div>
+      <div class="q"><h3><svg viewBox="0 0 24 24" fill="currentColor"><path d="M11 18h2v-2h-2zm1-16a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm0-14a4 4 0 0 0-4 4h2a2 2 0 1 1 4 0c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5a4 4 0 0 0-4-4z"/></svg>Questions</h3>
+        <ul>{% for x in t.questions %}<li>{{ x }}</li>{% else %}<li class="empty">None recurring</li>{% endfor %}</ul></div>
+      <div class="p"><h3><svg viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h4V9H1zm22-11a2 2 0 0 0-2-2h-6.31l.95-4.57.03-.32a1.5 1.5 0 0 0-.44-1.06L14.17 1 7.59 7.59A2 2 0 0 0 7 9v10a2 2 0 0 0 2 2h9a2 2 0 0 0 1.84-1.22l3.02-7.05A2 2 0 0 0 23 12z"/></svg>Praise</h3>
+        <ul>{% for x in t.praise %}<li>{{ x }}</li>{% else %}<li class="empty">None recurring</li>{% endfor %}</ul></div>
+    </div>
+    {% if t.recurring_themes %}<p class="recurring">Also recurring: {{ t.recurring_themes | join(' · ') }}</p>{% endif %}
+  {% endif %}
+</section>
+{%- endmacro %}
+
+{% macro flags(f) -%}
+{% if f.low or f.early_count or f.quarantined or f.overflow %}
+<footer class="flags">
+  <h5>Flagged</h5>
+  <ul>
+    {% if f.low %}<li>{{ f.low | length }} classification{{ 's' if f.low | length != 1 }} came back low confidence:
+      {% for c in f.low %}<a href="{{ url_for('video_page', video_id=c.video_id) }}">{{ c.title }}</a>{{ ', ' if not loop.last }}{% endfor %}</li>{% endif %}
+    {% if f.early_count %}<li>{{ f.early_count }} video{{ 's' if f.early_count != 1 }} under 7 days old — too early to judge, shown as “Just launched”.</li>{% endif %}
+    {% if f.quarantined %}<li>{{ f.quarantined | length }} couldn’t be classified and {{ 'were' if f.quarantined | length != 1 else 'was' }} set aside:
+      {% for q in f.quarantined %}<a href="{{ url_for('video_page', video_id=q.video_id) }}">{{ q.title }}</a>{{ ', ' if not loop.last }}{% endfor %}</li>{% endif %}
+    {% for b, n in f.overflow.items() %}<li>{{ b }} posted an unusually large batch; {{ n }} videos deferred to the next run.</li>{% endfor %}
+  </ul>
+</footer>
+{% endif %}
+{%- endmacro %}
+
+{% macro run_banner(run) -%}
+{% if run and run.status in ('failed', 'ok_with_errors') %}
+<div class="banner" role="status">
+  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M1 21h22L12 2zm12-3h-2v-2h2zm0-4h-2v-4h2z"/></svg>
+  <div>
+    {% if run.status == 'failed' %}
+    <p><b style="font-weight:500">The last run failed partway, on {{ run.started_at | dt('%d %b at %H:%M') }} UTC.</b></p>
+    <p class="sub">{{ run.message }} — nothing was saved from that run, so this page shows the last complete data. The next run picks up where it left off.</p>
+    {% else %}
+    <p><b style="font-weight:500">The last run finished with {{ run.errors }} error{{ 's' if run.errors != 1 }}.</b></p>
+    <p class="sub">Videos that couldn’t be processed are listed under Flagged and will be retried next run.</p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+{%- endmacro %}
