@@ -28,7 +28,7 @@ def test_digest_leads_with_insight(tmp_path):
     add(conn, "hit", 10, 3000)
     add(conn, "new", 2, 100)
     md = digest(conn)
-    assert '**Outperforming:** "T-hit" — 3.0x channel median' in md
+    assert '**Outperforming:** "T-hit" — 3.0x the full-episode median' in md
     assert "UGC · " in md and "no offer" in md
     assert '"T-new"' in md and "too early to judge" in md
     assert "|" not in md  # no raw data tables

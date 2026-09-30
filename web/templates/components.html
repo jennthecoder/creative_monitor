@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% import "_ui.html" as ui %}
+{% block title %}Design system · Creative Monitor{% endblock %}
+{% block main %}
+<div class="page lib">
+  <div class="eyebrow" style="margin-top:16px">Design system</div>
+  <h1 class="title">Components and intent</h1>
+  <p class="rub-intro">YouTube’s visual language — Roboto, near-black ink, chip greys, rounded 16:9 thumbnails —
+    held to one editorial rule: the page should read like a briefing, and red means exactly one thing.
+    Every example below is rendered from live data.</p>
+
+  <h2>Colour</h2>
+  <p class="intent">Written as intent, not hex. Neutrals do almost all the work.</p>
+  <div class="swatches">
+    <div class="sw"><div class="chipc" style="background:var(--accent-out)"></div><b>Outperformance</b><p>YouTube Red. Appears only where a creative beat its own channel’s median by 1.5x or more. Not on the logo, buttons, chips or headers — if red is on screen, something worked.</p></div>
+    <div class="sw"><div class="chipc" style="background:var(--ink)"></div><b>Ink / structure</b><p>YouTube near-black. Headings, active navigation, the 1.0x baseline marker, and bars that are above baseline but not outperforming.</p></div>
+    <div class="sw"><div class="chipc" style="background:var(--ink-2)"></div><b>Secondary text</b><p>Metadata, captions, audience themes, the flagged footnote.</p></div>
+    <div class="sw"><div class="chipc" style="background:var(--ink-3)"></div><b>Tertiary / below baseline</b><p>Dimension captions and below-baseline bars. Underperformance gets no colour of its own — absence of red is the signal, without passing judgment.</p></div>
+    <div class="sw"><div class="chipc" style="background:var(--chip)"></div><b>Chip grey</b><p>Neutral containers: attribute chips, filters, the video details panel.</p></div>
+    <div class="sw"><div class="chipc" style="background:var(--surface)"></div><b>Callout tint</b><p>Sets the shift callout and status banners apart without borders.</p></div>
+    <div class="sw"><div class="chipc" style="background:var(--link)"></div><b>Link</b><p>YouTube link blue, for navigation text only.</p></div>
+  </div>
+
+  <h2>Type</h2>
+  <p class="intent">One family (Roboto), two voices. The insight is set large and regular so it reads as a sentence; data is small, quiet and tabular so columns of indices line up.</p>
+  <p class="headline" style="margin:8px 0">Insight voice — 26/36 regular. “Three of the last five are UGC.”</p>
+  <p class="num" style="font-size:12px;color:var(--ink-2)">Data voice — 12/16, tabular figures: 0.04x · 1.8x · 22.6x · 1,891,981 views</p>
+
+  <h2>Performance indicator</h2>
+  <p class="intent">The index against the channel’s own median for the same format, on a log scale with the 1.0x baseline marked. The line is the concept: you’re seeing relative performance, not absolute views. Dashed fill = under 7 days old.</p>
+  {% for x, p, bar, txt in perf_examples %}
+  {{ ui.perf({'index': x, 'perf': p, 'bar': bar, 'index_text': txt, 'bucket_singular': 'Short', 'too_early': False}) }}
+  {% endfor %}
+  {{ ui.perf({'index': 1.6, 'perf': 'out', 'bar': 0.6, 'index_text': '1.6x', 'bucket_singular': 'Short', 'too_early': True}) }}
+
+  {% if sample %}
+  <h2>Creative card — compact</h2>
+  <p class="intent">The digest’s repeating unit. Thumbnail largest, then title, then the index. Chips and themes support.</p>
+  {{ ui.card(sample) }}
+  <h2>Creative card — expanded</h2>
+  <p class="intent">Channel history density.</p>
+  {{ ui.card(sample, expanded=True) }}
+  <h2>Attribute chips</h2>
+  <p class="intent">One neutral treatment with the dimension name as a caption. Categorical, never ranked or colour-coded.</p>
+  {{ ui.chips(sample) }}
+  <h2>Theme cluster</h2>
+  <p class="intent">Objections lead and carry weight — they’re the actionable ones. Questions and praise stay quiet.</p>
+  {{ ui.themes(sample.themes) }}
+  {% endif %}
+
+  {% if shift %}
+  <h2>Shift callout</h2>
+  <p class="intent">The highest-value content: a change in a channel’s pattern. Set apart by tint and scale, never buried among cards.</p>
+  {{ ui.shift(shift) }}
+  {% endif %}
+
+  <h2>Flagged block</h2>
+  <p class="intent">Deliberately understated. It exists to be honest, not to be read first.</p>
+  {{ ui.flags(d.flags) }}
+
+  <h2>Empty and error states</h2>
+  <p class="intent">Common in practice. Each says what happened and what it means for the reader.</p>
+  <h3 class="subhead">A channel with no new creatives</h3>
+  <div class="quiet"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 16H5V5h14zM7 10h2v7H7zm4-3h2v10h-2zm4 6h2v4h-2z" opacity=".6"/></svg>
+    <div><b style="color:var(--ink);font-weight:500">No new creatives this week.</b><br>This channel usually posts about 5 a week.</div></div>
+  <h3 class="subhead">Comments disabled</h3>
+  {{ ui.themes(None, True) }}
+  <h3 class="subhead">A run that failed partway</h3>
+  {{ ui.run_banner({'status': 'failed', 'started_at': '2026-09-28T13:00:04+00:00', 'message': 'playlistItems: YouTube quota exhausted (quotaExceeded)'}) }}
+  {{ ui.run_banner({'status': 'ok_with_errors', 'errors': 2}) }}
+</div>
+{% endblock %}

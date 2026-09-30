@@ -1,7 +1,6 @@
-# Channels to monitor. channel_id is the YouTube channel ID (starts with "UC").
-# Placeholders below — replace with real competitor channels.
+# Channels to monitor. channel_id is a YouTube channel ID ("UC…") or an @handle.
 brands:
-  - name: Brand A
-    channel_id: UC_REPLACE_ME_A
-  - name: Brand B
-    channel_id: UC_REPLACE_ME_B
+  - name: The Diary Of A CEO
+    channel_id: UCGq-a57w-aPwyi3pW7XLiHw   # @TheDiaryOfACEO
+  - name: What Now? with Trevor Noah
+    channel_id: UC8bTQzxgvKkXDAaWkeuUlkg   # @trevornoah — episodes post to Trevor's main channel

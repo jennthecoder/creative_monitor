@@ -73,3 +73,25 @@ def test_no_eligible_videos_gives_none(tmp_path):
 
 def test_zero_views_engagement_is_none():
     assert metrics.engagement_rate(0, 1, 1) is None
+
+
+def test_shorts_and_long_form_have_separate_baselines(tmp_path):
+    c = store.connect(tmp_path / "t.db")
+    for i in range(5):  # Shorts ~10k, episodes ~1M
+        for vid, dur, views in [(f"s{i}", 45, 10_000), (f"e{i}", 3600, 1_000_000)]:
+            store.insert_video(c, {"video_id": vid, "brand": "P", "duration_seconds": dur,
+                                   "published_at": (NOW - timedelta(days=10 + i)).isoformat()})
+            store.save_metrics(c, vid, views, 1, 1, measured_at="2026-09-30")
+    s = metrics.score_brand(c, "P", NOW)
+    assert s["e0"].view_index == pytest.approx(1.0) and s["e0"].bucket == "episode"
+    assert s["s0"].view_index == pytest.approx(1.0) and s["s0"].bucket == "short"
+
+
+def test_bucket_boundary():
+    assert metrics.format_bucket(180) == "short" and metrics.format_bucket(181) == "clip"
+    assert metrics.format_bucket(1200) == "clip" and metrics.format_bucket(1201) == "episode"
+    assert metrics.format_bucket(None) == "episode"
+
+
+def test_hidden_likes_engagement_is_none():
+    assert metrics.engagement_rate(1000, None, 5) is None

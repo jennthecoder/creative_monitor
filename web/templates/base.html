@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Creative Monitor{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+<header class="mast">
+  <button class="burger" aria-label="Menu" onclick="document.body.classList.toggle('nav-open')">
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M21 6H3V5h18v1zm0 5H3v1h18v-1zm0 6H3v1h18v-1z"/></svg>
+  </button>
+  <a class="logo" href="{{ url_for('digest_page') }}" aria-label="Creative Monitor home">
+    {# Monochrome on purpose: red is reserved for outperformance. #}
+    <svg viewBox="0 0 30 21" aria-hidden="true"><rect width="30" height="21" rx="5" fill="#0f0f0f"/><path d="M12 6.2v8.6l7.4-4.3z" fill="#fff"/></svg>
+    <span class="word">Creative Monitor</span>
+  </a>
+  {% block weeknav %}<div style="margin:0 auto"></div>{% endblock %}
+  {% if last_run %}
+  {% set st = last_run.status %}
+  <a class="runpill" href="{{ url_for('runs_page') }}" title="Last pipeline run">
+    <span class="dot {{ 'ok' if st == 'ok' else 'warn' if st == 'ok_with_errors' else 'fail' if st == 'failed' else '' }}"></span>
+    <span class="txt">Last run {{ last_run.started_at | dt('%d %b, %H:%M') }} UTC</span>
+  </a>
+  {% endif %}
+</header>
+<div class="shell">
+  <nav class="guide" aria-label="Main">
+    <a href="{{ url_for('digest_page') }}" class="{{ 'on' if path == '/' }}">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 5h16v2H4zm0 6h16v2H4zm0 6h10v2H4z"/></svg>Weekly digest</a>
+    <a href="{{ url_for('rubric_page') }}" class="{{ 'on' if path.startswith('/rubric') }}">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75z"/></svg>Rubric</a>
+    <hr>
+    <h4>Channels</h4>
+    {% for b in nav_brands %}
+    <a href="{{ url_for('brand_page', slug=b.slug) }}" class="{{ 'on' if path == '/channel/' ~ b.slug }}">
+      <span class="avatar">{{ initials(b.name) }}</span>{{ b.name }}</a>
+    {% endfor %}
+    <hr>
+    <a href="{{ url_for('runs_page') }}" class="{{ 'on' if path == '/runs' }}">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 1 1 2.05 4.95l-1.42 1.42A9 9 0 1 0 13 3zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8z"/></svg>Run history</a>
+    <a href="{{ url_for('components') }}" class="{{ 'on' if path == '/components' }}">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h7v7H4zm9 0h7v7h-7zM4 13h7v7H4zm9 0h7v7h-7z"/></svg>Design system</a>
+    <a href="{{ url_for('build_log') }}" class="{{ 'on' if path == '/build-log' }}">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zm-1 7V3.5L18.5 9zM8 13h8v2H8zm0 4h8v2H8z"/></svg>Build log</a>
+  </nav>
+  <main>{% block main %}{% endblock %}</main>
+</div>
+<script>
+  // Fall back from maxres to hq thumbnails (not every video has maxres).
+  document.querySelectorAll('img[data-fallback]').forEach(function (img) {
+    img.addEventListener('error', function () { if (img.src !== img.dataset.fallback) img.src = img.dataset.fallback; }, { once: true });
+  });
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

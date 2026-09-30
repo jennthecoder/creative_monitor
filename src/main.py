@@ -11,9 +11,11 @@ import argparse
 import logging
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
-import anthropic
+import openai
 from dotenv import load_dotenv
 
 from . import classify, deliver, fetch, report, store, synthesise
@@ -21,10 +23,11 @@ from .config import load_brands, load_rubric
 
 log = logging.getLogger("monitor")
 SYNTH_MAX_AGE_DAYS = 21  # themes only appear in the digest for recent videos
+LLM_WORKERS = int(os.getenv("LLM_WORKERS", "6"))
 
 
 def run(skip_synthesis: bool = False, no_deliver: bool = False) -> int:
-    load_dotenv()
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
     brands, rubric = load_brands(), load_rubric()
     conn = store.connect()
     run_id = store.start_run(conn)
@@ -32,8 +35,8 @@ def run(skip_synthesis: bool = False, no_deliver: bool = False) -> int:
 
     try:
         yt = fetch.YouTubeClient(os.getenv("YOUTUBE_API_KEY", ""))
-        if not os.getenv("ANTHROPIC_API_KEY"):
-            raise fetch.YouTubeError("ANTHROPIC_API_KEY is not set")
+        if not os.getenv("OPENAI_API_KEY"):
+            raise fetch.YouTubeError("OPENAI_API_KEY is not set")
         result = fetch.run_fetch(conn, yt, brands)
     except fetch.YouTubeError as e:
         conn.rollback()
@@ -43,7 +46,7 @@ def run(skip_synthesis: bool = False, no_deliver: bool = False) -> int:
     log.info("Fetched %d new videos (%d stats refreshed, %d YouTube units)",
              len(result.new_videos), result.refreshed, yt.units_used)
 
-    claude = anthropic.Anthropic()
+    ai = openai.OpenAI()
     details = dict(result.new_videos)
 
     # --- classify (includes anything left unclassified by an earlier run) ---
@@ -56,22 +59,28 @@ def run(skip_synthesis: bool = False, no_deliver: bool = False) -> int:
         except fetch.YouTubeError as e:
             log.error("Could not refetch details for %d pending videos: %s", len(missing), e)
             errors += 1
-    for vid in pending:
-        video = details.get(vid)
-        if not video:
-            continue
-        try:
-            thumb = classify.fetch_thumbnail(video.get("thumbnail_url"))
-            c = classify.classify_video(claude, video, rubric, thumb)
-            store.save_classification(conn, vid, c.values, c.confidence, c.rationale, rubric["version"])
-            conn.commit()
-            classified += 1
-            log.info("Classified %s [%s]: %s", vid, c.confidence, video.get("title"))
-        except classify.ClassificationFailed as e:
-            store.quarantine(conn, vid, "classify", str(e))
-            conn.commit()
-            errors += 1
-            log.warning("Quarantined %s: %s", vid, e)
+    def _classify(vid):
+        video = details[vid]
+        thumb = classify.fetch_thumbnail(video.get("thumbnail_url"))
+        return classify.classify_video(ai, video, rubric, thumb)
+
+    # LLM calls run in parallel; all DB writes stay on this thread (SQLite).
+    with ThreadPoolExecutor(max_workers=LLM_WORKERS) as pool:
+        futures = {pool.submit(_classify, vid): vid for vid in pending if vid in details}
+        for fut in as_completed(futures):
+            vid = futures[fut]
+            try:
+                c = fut.result()
+                store.save_classification(conn, vid, c.values, c.confidence, c.rationale,
+                                          rubric["version"])
+                conn.commit()
+                classified += 1
+                log.info("Classified %s [%s]: %s", vid, c.confidence, details[vid].get("title"))
+            except classify.ClassificationFailed as e:
+                store.quarantine(conn, vid, "classify", str(e))
+                conn.commit()
+                errors += 1
+                log.warning("Quarantined %s: %s", vid, e)
 
     # --- synthesise comments for recent videos without themes ---
     if not skip_synthesis:
@@ -83,7 +92,7 @@ def run(skip_synthesis: bool = False, no_deliver: bool = False) -> int:
             video = store.get_video(conn, vid)
             try:
                 comments = fetch.fetch_comments(yt, vid)  # in memory only, never stored
-                themes = synthesise.synthesise_comments(claude, video, comments)
+                themes = synthesise.synthesise_comments(ai, video, comments)
                 store.save_comment_themes(conn, vid, themes)
                 conn.commit()
             except fetch.QuotaExceeded as e:

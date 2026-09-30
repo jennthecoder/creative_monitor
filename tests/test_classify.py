@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src import classify
+from src import classify, llm
 from src.config import load_rubric
 
 RUBRIC = load_rubric()
@@ -16,18 +16,18 @@ GOOD = {"hook_type": "bold_claim", "format": "talking_head", "angle": "quality_d
 
 
 class FakeClient:
-    """Returns queued raw text responses from beta.messages.create."""
+    """Mimics openai.OpenAI().chat.completions.create with queued raw text responses."""
 
-    def __init__(self, *responses, stop_reason="end_turn"):
+    def __init__(self, *responses, refusal=None, finish_reason="stop"):
         self.responses, self.calls = list(responses), []
-        self.stop_reason = stop_reason
-        self.beta = SimpleNamespace(messages=SimpleNamespace(create=self._create))
+        self.refusal, self.finish_reason = refusal, finish_reason
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._create))
 
     def _create(self, **kw):
         self.calls.append(kw)
-        text = self.responses.pop(0)
-        return SimpleNamespace(stop_reason=self.stop_reason,
-                               content=[SimpleNamespace(type="text", text=text)])
+        text = self.responses.pop(0) if self.responses else ""
+        msg = SimpleNamespace(content=text, refusal=self.refusal)
+        return SimpleNamespace(choices=[SimpleNamespace(message=msg, finish_reason=self.finish_reason)])
 
 
 def test_schema_built_from_rubric():
@@ -51,7 +51,7 @@ def test_malformed_then_good_retries_once():
     fc = FakeClient("not json {", json.dumps(GOOD))
     c = classify.classify_video(fc, VIDEO, RUBRIC)
     assert c.confidence == "high" and len(fc.calls) == 2
-    assert "could not be parsed" in fc.calls[1]["messages"][0]["content"][-1]["text"]
+    assert "could not be parsed" in fc.calls[1]["messages"][1]["content"][-1]["text"]
 
 
 def test_malformed_twice_raises_for_quarantine():
@@ -67,11 +67,24 @@ def test_out_of_rubric_value_forces_low_confidence_not_coerced():
 
 def test_refusal_raises():
     with pytest.raises(classify.ClassificationFailed):
-        classify.classify_video(FakeClient(json.dumps(GOOD), stop_reason="refusal"), VIDEO, RUBRIC)
+        classify.classify_video(FakeClient(json.dumps(GOOD), refusal="no"), VIDEO, RUBRIC)
+
+
+def test_truncation_raises():
+    with pytest.raises(classify.ClassificationFailed):
+        classify.classify_video(FakeClient("{", finish_reason="length"), VIDEO, RUBRIC)
 
 
 def test_thumbnail_is_sent_first():
     fc = FakeClient(json.dumps(GOOD))
-    thumb = {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": "AA=="}}
+    thumb = llm.image("AA==", "image/jpeg")
     classify.classify_video(fc, VIDEO, RUBRIC, thumbnail=thumb)
-    assert fc.calls[0]["messages"][0]["content"][0]["type"] == "image"
+    first = fc.calls[0]["messages"][1]["content"][0]
+    assert first == {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,AA=="}}
+    assert fc.calls[0]["response_format"]["json_schema"]["strict"] is True
+
+
+def test_podcast_rubric_loads_and_builds_schema():
+    from pathlib import Path
+    r = load_rubric(Path(__file__).parent.parent / "config" / "rubric.podcast.yaml")
+    assert r["version"] == "podcast-1" and "guest_type" in classify.build_schema(r)["properties"]

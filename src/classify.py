@@ -1,4 +1,4 @@
-"""Claude: classify one video against the rubric.
+"""LLM: classify one video against the rubric.
 
 The rubric is injected from rubric.yaml into both the prompt and the JSON schema,
 so swapping the rubric changes what is measured without touching this file.
@@ -8,22 +8,20 @@ from __future__ import annotations
 import base64
 import json
 import logging
-import os
 from dataclasses import dataclass
 
-import anthropic
 import requests
+
+from . import llm
 
 log = logging.getLogger(__name__)
 
-MODEL = os.getenv("CLAUDE_MODEL", "claude-opus-5-5")
-EFFORT = os.getenv("CLAUDE_EFFORT", "low")
 CONFIDENCE = ["high", "medium", "low"]
 DESCRIPTION_CHARS = 1500
 
 SYSTEM = (
-    "You are a senior creative strategist at a performance marketing agency. "
-    "You classify competitor brand videos against a fixed creative rubric so that "
+    "You are a senior creative strategist. "
+    "You classify competitor channel videos against a fixed creative rubric so that "
     "patterns can be compared week over week. Judge from the title, description, "
     "tags, duration and thumbnail. Pick exactly one allowed value per dimension. "
     "Use 'other' or 'none' when nothing fits rather than stretching a category. "
@@ -85,8 +83,7 @@ def fetch_thumbnail(url: str | None, session=requests) -> dict | None:
     media = r.headers.get("Content-Type", "image/jpeg").split(";")[0]
     if media not in {"image/jpeg", "image/png", "image/webp", "image/gif"}:
         media = "image/jpeg"
-    return {"type": "image", "source": {"type": "base64", "media_type": media,
-                                        "data": base64.standard_b64encode(r.content).decode()}}
+    return llm.image(base64.standard_b64encode(r.content).decode(), media)
 
 
 def validate(raw: str, rubric: dict) -> Classification:
@@ -108,42 +105,23 @@ def validate(raw: str, rubric: dict) -> Classification:
     return Classification(values, confidence, str(data.get("rationale", ""))[:500], invalid)
 
 
-def _call(client, content: list, schema: dict) -> str:
-    resp = client.beta.messages.create(
-        model=MODEL,
-        max_tokens=2048,
-        system=SYSTEM,
-        messages=[{"role": "user", "content": content}],
-        output_config={"effort": EFFORT, "format": {"type": "json_schema", "schema": schema}},
-        betas=["server-side-fallback-2026-07-01"],
-        fallbacks="default",
-    )
-    if resp.stop_reason == "refusal":
-        raise ClassificationFailed("model declined to classify")
-    if resp.stop_reason == "max_tokens":
-        raise ClassificationFailed("response truncated at max_tokens")
-    return next((b.text for b in resp.content if b.type == "text"), "")
-
-
 def classify_video(client, video: dict, rubric: dict, thumbnail: dict | None = None) -> Classification:
-    """One Claude call; one retry with the parse error appended. Raises
+    """One LLM call; one retry with the parse error appended. Raises
     ClassificationFailed after the second failure so the caller can quarantine."""
     schema = build_schema(rubric)
-    content = ([thumbnail] if thumbnail else []) + [{"type": "text", "text": build_prompt(video, rubric)}]
+    parts = ([thumbnail] if thumbnail else []) + [llm.text(build_prompt(video, rubric))]
     try:
         try:
-            return validate(_call(client, content, schema), rubric)
+            return validate(llm.complete_json(client, SYSTEM, parts, schema, "classification"), rubric)
         except ValueError as first:  # JSONDecodeError is a ValueError
             log.warning("classification parse failed for %s, retrying: %s",
                         video.get("video_id"), first)
-            retry = content + [{"type": "text", "text":
-                                f"Your previous response could not be parsed ({first}). "
-                                "Return only the JSON object."}]
+            retry = parts + [llm.text(f"Your previous response could not be parsed ({first}). "
+                                      "Return only the JSON object.")]
             try:
-                return validate(_call(client, retry, schema), rubric)
+                return validate(llm.complete_json(client, SYSTEM, retry, schema, "classification"),
+                                rubric)
             except ValueError as second:
                 raise ClassificationFailed(f"unparseable after retry: {second}") from second
-    except anthropic.APIStatusError as e:
-        raise ClassificationFailed(f"API error {e.status_code}: {e.message}") from e
-    except anthropic.APIConnectionError as e:
-        raise ClassificationFailed(f"connection error: {e}") from e
+    except llm.LLMError as e:
+        raise ClassificationFailed(str(e)) from e

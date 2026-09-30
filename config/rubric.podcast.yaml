@@ -1,0 +1,24 @@
+# Creative rubric for podcast / interview channels on YouTube.
+# Select with RUBRIC_FILE=rubric.podcast.yaml. Same pipeline, different lens.
+version: "podcast-1"
+dimensions:
+  content_type:
+    values: [full_episode, clip, short, trailer, other]
+  hook_type:
+    values: [provocative_claim, question, personal_story, expert_authority,
+             emotional_moment, controversy, curiosity_gap, other]
+  topic:
+    values: [health_wellness, money_career, relationships, psychology_mindset,
+             business_entrepreneurship, politics_society, entertainment_culture,
+             spirituality, science_tech, other]
+  guest_type:
+    values: [celebrity, expert_scientist, entrepreneur, author, athlete,
+             politician, no_guest, other]
+  title_style:
+    values: [quote, question, bold_claim, listicle_number, guest_name_led,
+             warning, other]
+  thumbnail_treatment:
+    values: [guest_face_closeup, host_and_guest, text_overlay_heavy,
+             emotional_expression, minimal, other]
+  emotional_tone:
+    values: [inspiring, alarming, vulnerable, humorous, informative, confrontational]

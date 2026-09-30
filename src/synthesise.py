@@ -1,4 +1,4 @@
-"""Claude: turn the top comments on a video into audience themes.
+"""LLM: turn the top comments on a video into audience themes.
 
 Privacy: comments arrive as plain text (fetch.py already dropped author names/IDs),
 live only in memory for the duration of this call, and are never persisted. Only
@@ -9,9 +9,7 @@ from __future__ import annotations
 import json
 import logging
 
-import anthropic
-
-from .classify import EFFORT, MODEL
+from . import llm
 
 log = logging.getLogger(__name__)
 
@@ -55,24 +53,10 @@ def synthesise_comments(client, video: dict, comments: list[str] | None) -> dict
     prompt = (f"Video: \"{video.get('title')}\" by {video.get('brand')}\n\n"
               f"Top {len(comments)} comments by relevance:\n{body}")
     try:
-        resp = client.beta.messages.create(
-            model=MODEL,
-            max_tokens=2048,
-            system=SYSTEM,
-            messages=[{"role": "user", "content": prompt}],
-            output_config={"effort": EFFORT, "format": {"type": "json_schema", "schema": SCHEMA}},
-            betas=["server-side-fallback-2026-07-01"],
-            fallbacks="default",
-        )
-    except anthropic.APIStatusError as e:
-        raise SynthesisFailed(f"API error {e.status_code}: {e.message}") from e
-    except anthropic.APIConnectionError as e:
-        raise SynthesisFailed(f"connection error: {e}") from e
-    if resp.stop_reason in {"refusal", "max_tokens"}:
-        raise SynthesisFailed(f"stop_reason={resp.stop_reason}")
-    try:
-        data = json.loads(next(b.text for b in resp.content if b.type == "text"))
-    except (StopIteration, ValueError) as e:
+        data = json.loads(llm.complete_json(client, SYSTEM, [llm.text(prompt)], SCHEMA, "comment_themes"))
+    except llm.LLMError as e:
+        raise SynthesisFailed(str(e)) from e
+    except ValueError as e:
         raise SynthesisFailed(f"unparseable response: {e}") from e
     themes = {k: [str(x)[:200] for x in data.get(k, [])][:5] for k in FIELDS}
     themes["overall_sentiment"] = data.get("overall_sentiment", "mixed")
