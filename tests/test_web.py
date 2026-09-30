@@ -60,7 +60,7 @@ def _load(path):
 def test_every_page_renders(client):
     for url in ["/", "/?week=2026-09-01", "/channel/the-test-channel",
                 "/channel/the-test-channel?format=short", "/video/vid0", "/video/vid1",
-                "/rubric", "/runs", "/build-log", "/components", "/api/digest"]:
+                "/rubric", "/api/digest"]:
         assert client.get(url).status_code == 200, url
 
 

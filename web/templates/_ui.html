@@ -5,7 +5,7 @@
    the concept; accent colour appears only when perf == 'out'. #}
 {% if c.index is not none %}
 <div class="perf {{ c.perf }} {{ 'early' if c.too_early }} {{ size }}"
-     title="{{ c.index_text }} the {{ c.bucket_singular }} median for this channel{{ ' — too early to judge' if c.too_early }}">
+     title="{{ c.index_text }} the {{ c.bucket_singular }} median for this channel{{ ', both at day 7' if c.age_matched else '' }}{{ ' — too early to judge' if c.too_early }}{{ ' — compares today’s totals, so older videos have had longer to collect views' if not c.age_matched and not c.too_early }}">
   <span class="fig">{{ c.index_text }}</span>
   <span>
     <span class="scale" aria-hidden="true">
@@ -15,7 +15,7 @@
       {% else %}<span class="fill" style="left:{{ pos }}%;width:{{ 50 - pos }}%"></span>{% endif %}
       <span class="base"></span>
     </span>
-    <span class="cap">{{ 'early · ' if c.too_early }}vs {{ c.bucket_singular }} median</span>
+    <span class="cap">{{ 'early · ' if c.too_early }}vs {{ c.bucket_singular }} median{{ ' at day 7' if c.age_matched }}</span>
   </span>
 </div>
 {% endif %}
@@ -52,6 +52,7 @@
     <h3><a href="{{ url_for('video_page', video_id=c.video_id) }}">{{ c.title }}</a></h3>
     <div class="meta num">{% if show_brand %}{{ c.brand }} · {% endif %}{{ c.views_text }} views · {{ c.ago }}{% if not c.too_early %} · {{ c.engagement_text }}{{ ' engagement' if c.engagement is not none }}{% endif %}</div>
     {{ perf(c) }}
+    {{ read(c) }}
     {{ chips(c) }}
     {% if c.theme_line %}<div class="theme">{{ c.theme_line }}</div>
     {% elif c.comments_off and expanded %}<div class="theme">Comments are turned off on this video.</div>{% endif %}
@@ -59,6 +60,20 @@
     {{ lowconf(c) }}
   </div>
 </article>
+{%- endmacro %}
+
+{% macro read(c) -%}
+{# Reach vs resonance: a title/thumbnail win is not a content win. #}
+{% if c.read %}<div class="read"><b>{{ c.read.label }}.</b> {{ c.read.text }}</div>{% endif %}
+{%- endmacro %}
+
+{% macro patterns(ps) -%}
+{# Hit rate, not a median: how often the attribute beat the channel's norm. #}
+{% if ps %}
+<ul class="working">
+  {% for p in ps %}<li><b>What’s working: {{ p.label }}.</b> <span class="num">{{ p.text }}</span>.{% if p.confirmed_by %} Also holds on {{ p.confirmed_by | join(', ') }}.{% endif %}{% if not p.age_matched %} <span class="note">Includes videos not yet compared at day 7.</span>{% endif %}</li>{% endfor %}
+</ul>
+{% endif %}
 {%- endmacro %}
 
 {% macro tile(c) -%}

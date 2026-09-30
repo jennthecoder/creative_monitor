@@ -22,6 +22,11 @@ from .metrics import MIN_AGE_DAYS, _parse, score_brand
 OUTPERFORM = 1.5
 UNDERPERFORM = 0.67
 MIN_ATTR_VIDEOS = 3
+MIN_ATTR_HITS = 2
+HIT_RATE_LIFT = 0.15     # a pattern must beat the channel's own hit rate by this much
+MAX_PATTERNS = 3
+PACKAGING_WEAK = 0.8     # engagement index at or below this = response lagged reach
+RESONANCE_STRONG = 1.5   # engagement index at or above this = strong response
 SHIFT_WINDOW = 5
 MAX_VERDICTS = 2
 EARLY_LEADERS = 3
@@ -153,6 +158,27 @@ def bar_position(idx: float | None) -> float | None:
     return min(1.0, max(0.0, (math.log10(idx) + 1) / 2))
 
 
+def read(s) -> dict | None:
+    """Reach (views) vs resonance (engagement), each against the channel's norm.
+    Separates a title/thumbnail win from a content win. None when too early or
+    either side is missing."""
+    if not s or s.too_early or s.view_index is None or s.engagement_index is None:
+        return None
+    v, e = s.view_index, s.engagement_index
+    if v >= OUTPERFORM and e >= 1.2:
+        return {"key": "both", "label": "Reach and resonance",
+                "text": "Pulled viewers in and they responded — a full creative win."}
+    if v >= OUTPERFORM and e <= PACKAGING_WEAK:
+        return {"key": "packaging", "label": "Packaging-led",
+                "text": f"The title and thumbnail pulled viewers in, but engagement ran at "
+                        f"{fmt_index(e)} the channel norm — the content landed less well."}
+    if v < 1.0 and e >= RESONANCE_STRONG:
+        return {"key": "underpackaged", "label": "Under-packaged",
+                "text": f"Viewers who found it engaged at {fmt_index(e)} the channel norm — "
+                        f"the packaging may be what held it back."}
+    return None
+
+
 # --- data access ----------------------------------------------------------
 
 def brand_videos(conn, brand: str) -> list[dict]:
@@ -198,6 +224,15 @@ def card(v: dict, scores: dict, rubric: dict, now: datetime) -> dict:
         "engagement_text": (fmt_pct(s.engagement_rate) if s and s.engagement_rate is not None
                             else "likes hidden"),
         "too_early": bool(s and s.too_early),
+        "age_matched": bool(s and s.age_matched),
+        "engagement_index": s.engagement_index if s else None,
+        "engagement_index_text": fmt_index(s.engagement_index if s else None),
+        "like_rate_text": fmt_pct(s.like_rate) if s and s.like_rate is not None else "hidden",
+        "comment_rate_text": (f"{s.comment_rate * 100:.2f}%" if s and s.comment_rate is not None
+                              else "off"),
+        "like_index_text": fmt_index(s.like_index if s else None),
+        "comment_index_text": fmt_index(s.comment_index if s else None),
+        "read": read(s),
         "chips": chips,
         "confidence": cls["confidence"] if cls else None,
         "rationale": cls["rationale"] if cls else None,
@@ -214,21 +249,60 @@ def card(v: dict, scores: dict, rubric: dict, now: datetime) -> dict:
 
 # --- analysis -------------------------------------------------------------
 
-def attribute_winners(videos: list[dict], scores: dict, rubric: dict) -> list[tuple[str, float, int]]:
-    """Median view index per attribute value, over judgeable, confidently-classified
-    videos. Low-confidence classifications are excluded, not silently counted."""
-    buckets: dict[tuple[str, str], list[float]] = {}
+def attribute_patterns(videos: list[dict], scores: dict, rubric: dict) -> list[dict]:
+    """Attribute values that beat the channel's norm more often than its videos do in
+    general: hit rate (share at OUTPERFORM or better) vs the channel's base rate.
+    A hit rate with its sample size says how far to trust a pattern; one viral video
+    can move a median but not a hit rate. Only judgeable, confidently-classified
+    videos count."""
+    pool, buckets = [], {}
     for v in videos:
         s, c = scores.get(v["video_id"]), v["cls"]
         if not s or s.too_early or s.view_index is None or not c or c["confidence"] == "low":
             continue
+        pool.append(s)
         for dim in rubric["dimensions"]:
             val = c["values"].get(dim)
-            if val and val not in ("other",):
-                buckets.setdefault((dim, val), []).append(s.view_index)
-    ranked = [(label(d, v), median(xs), len(xs)) for (d, v), xs in buckets.items()
-              if len(xs) >= MIN_ATTR_VIDEOS]
-    return sorted([r for r in ranked if r[1] >= 1.2], key=lambda r: -r[1])[:2]
+            if val and val != "other":
+                buckets.setdefault((dim, val), []).append(s)
+    if not pool:
+        return []
+    base_rate = sum(s.view_index >= OUTPERFORM for s in pool) / len(pool)
+    found = []
+    for (dim, val), ss in buckets.items():
+        hits = sum(s.view_index >= OUTPERFORM for s in ss)
+        rate = hits / len(ss)
+        if len(ss) >= MIN_ATTR_VIDEOS and hits >= MIN_ATTR_HITS and rate >= base_rate + HIT_RATE_LIFT:
+            found.append({
+                "key": f"{dim}:{val}", "label": label(dim, val), "hits": hits, "n": len(ss),
+                "rate": rate, "base_rate": base_rate,
+                "median": median(s.view_index for s in ss),
+                "age_matched": all(s.age_matched for s in ss), "confirmed_by": [],
+                "text": (f"{hits} of {len(ss)} beat {OUTPERFORM}x their format median "
+                         f"({rate:.0%}, against {base_rate:.0%} for the channel overall)"),
+            })
+    return sorted(found, key=lambda p: (-p["rate"], -p["n"]))[:MAX_PATTERNS]
+
+
+def cross_channel(sections: list[dict]) -> list[dict]:
+    """Patterns that hold on more than one channel: stronger evidence than any single
+    channel's, because the audience and host differ. Marks each brand's pattern."""
+    by_key: dict[str, list[tuple[str, dict]]] = {}
+    for b in sections:
+        for p in b["winners"]:
+            by_key.setdefault(p["key"], []).append((b["name"], p))
+    out = []
+    for key, items in by_key.items():
+        if len(items) < 2:
+            continue
+        names = [n for n, _ in items]
+        for n, p in items:
+            p["confirmed_by"] = [x for x in names if x != n]
+        hits, total = sum(p["hits"] for _, p in items), sum(p["n"] for _, p in items)
+        out.append({"label": items[0][1]["label"], "brands": names, "hits": hits, "n": total,
+                    "text": (f"{hits} of {total} beat {OUTPERFORM}x their format median "
+                             f"across {_join(names)}")})
+    return sorted(out, key=lambda x: -x["hits"] / x["n"])
 
 
 def dominant_attributes(videos: list[dict], rubric: dict, share: float = 0.4) -> str | None:
@@ -363,7 +437,7 @@ def build(conn, rubric: dict, brands: list[dict], now: datetime | None = None,
             "mix": [(BUCKET_NAMES[k], n) for k, n in sorted(buckets.items(), reverse=True)],
             "trend": publishing_trend(videos, week_start),
             "verdicts": verdicts,
-            "winners": attribute_winners(videos, scores, rubric),
+            "winners": attribute_patterns(videos, scores, rubric),
             "shift": detect_shift(videos, rubric),
             "launched_pattern": dominant_attributes(new, rubric),
             "leaders": [card(v, scores, rubric, now) for v in leaders],
@@ -384,6 +458,7 @@ def build(conn, rubric: dict, brands: list[dict], now: datetime | None = None,
         "week_end": now,
         "total_new": sum(s["new_count"] for s in sections),
         "headline": headline(sections),
+        "cross_channel": cross_channel(sections),
         "brands": sections,
         "flags": {"low": flagged_low, "early_count": early_count,
                   "quarantined": quarantined, "overflow": overflow or {}},

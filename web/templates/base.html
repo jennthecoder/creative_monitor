@@ -22,10 +22,10 @@
   {% block weeknav %}<div style="margin:0 auto"></div>{% endblock %}
   {% if last_run %}
   {% set st = last_run.status %}
-  <a class="runpill" href="{{ url_for('runs_page') }}" title="Last pipeline run">
+  <span class="runpill" title="Last pipeline run">
     <span class="dot {{ 'ok' if st == 'ok' else 'warn' if st == 'ok_with_errors' else 'fail' if st == 'failed' else '' }}"></span>
     <span class="txt">Last run {{ last_run.started_at | dt('%d %b, %H:%M') }} UTC</span>
-  </a>
+  </span>
   {% endif %}
 </header>
 <div class="shell">
@@ -40,13 +40,6 @@
     <a href="{{ url_for('brand_page', slug=b.slug) }}" class="{{ 'on' if path == '/channel/' ~ b.slug }}">
       <span class="avatar">{{ initials(b.name) }}</span>{{ b.name }}</a>
     {% endfor %}
-    <hr>
-    <a href="{{ url_for('runs_page') }}" class="{{ 'on' if path == '/runs' }}">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 1 1 2.05 4.95l-1.42 1.42A9 9 0 1 0 13 3zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8z"/></svg>Run history</a>
-    <a href="{{ url_for('components') }}" class="{{ 'on' if path == '/components' }}">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M4 4h7v7H4zm9 0h7v7h-7zM4 13h7v7H4zm9 0h7v7h-7z"/></svg>Design system</a>
-    <a href="{{ url_for('build_log') }}" class="{{ 'on' if path == '/build-log' }}">
-      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zm-1 7V3.5L18.5 9zM8 13h8v2H8zm0 4h8v2H8z"/></svg>Build log</a>
   </nav>
   <main>{% block main %}{% endblock %}</main>
 </div>

@@ -11,7 +11,6 @@ import re
 from datetime import datetime, time, timedelta, timezone
 from pathlib import Path
 
-import markdown
 import yaml
 from dotenv import load_dotenv
 from flask import Flask, abort, jsonify, redirect, render_template, request, url_for
@@ -120,7 +119,7 @@ def brand_page(slug):
         "brand.html", brand=b, slug=slug, weeks=weeks, fmt=fmt, total=len(videos),
         baselines={k: digest.fmt_views(int(v)) if v else None for k, v in baselines.items()},
         counts=counts, bucket_names=digest.BUCKET_NAMES,
-        winners=digest.attribute_winners(videos, scores, rubric),
+        winners=digest.attribute_patterns(videos, scores, rubric),
         shift=digest.detect_shift(videos, rubric),
         trend=digest.publishing_trend(videos, now - timedelta(days=7)))
 
@@ -138,12 +137,13 @@ def video_page(video_id):
     c = digest.card(this, scores, rubric, now)
     s = scores.get(video_id)
     baseline = digest.fmt_views(int(s.baseline)) if s and s.baseline else None
+    age_matched_base = any(x.age_matched for x in scores.values() if s and x.bucket == s.bucket)
     history = [dict(r) for r in conn.execute(
         "SELECT measured_at, views, likes, comment_count FROM metrics WHERE video_id = ? "
         "ORDER BY measured_at DESC", (video_id,))]
     more = [digest.card(x, scores, rubric, now) for x in videos if x["video_id"] != video_id][:12]
     q = conn.execute("SELECT reason FROM quarantine WHERE video_id = ?", (video_id,)).fetchone()
-    return render_template("video.html", c=c, baseline=baseline, history=history, more=more,
+    return render_template("video.html", c=c, baseline=baseline, age_matched_base=age_matched_base, history=history, more=more,
                            quarantine=q["reason"] if q else None,
                            rubric_matches=(c["rubric_version"] in (None, rubric["version"])))
 
@@ -221,33 +221,6 @@ def write_rubric(path: Path, version: str, dims: dict[str, list[str]]) -> None:
                            "dimensions": {k: {"values": v} for k, v in dims.items()}},
                           sort_keys=False, default_flow_style=None, width=88)
     path.write_text("\n".join(header + [body]))
-
-
-@app.get("/runs")
-def runs_page():
-    runs = [dict(r) for r in _conn().execute("SELECT * FROM runs ORDER BY run_id DESC LIMIT 50")]
-    return render_template("runs.html", runs=runs)
-
-
-@app.get("/build-log")
-def build_log():
-    text = (ROOT / "PROGRESS.md").read_text() if (ROOT / "PROGRESS.md").exists() else ""
-    html = markdown.markdown(text, extensions=["tables", "fenced_code"])
-    return render_template("buildlog.html", html=html)
-
-
-@app.get("/components")
-def components():
-    """Component library and empty/error states, rendered from real data."""
-    conn, rubric = _conn(), load_rubric()
-    d = digest.build(conn, rubric, load_brands())
-    cards = [c for b in d["brands"] for c in b["verdicts"] + b["leaders"]]
-    sample = next((c for c in cards if c["perf"] == "out" and c["theme_line"]), cards[0] if cards else None)
-    shift = next((b["shift"] for b in d["brands"] if b["shift"]), None)
-    perf_examples = [(x, digest.perf_class(x), digest.bar_position(x), digest.fmt_index(x))
-                     for x in (3.2, 1.2, 0.8, 0.3)]
-    return render_template("components.html", sample=sample, shift=shift,
-                           perf_examples=perf_examples, d=d)
 
 
 @app.get("/api/digest")

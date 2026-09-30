@@ -21,9 +21,7 @@
 
   {% if shift %}{{ ui.shift(shift) }}{% endif %}
   {% if winners %}
-  <ul class="working">
-    {% for attr, idx, n in winners %}<li><b>What’s working:</b> {{ attr }} videos run at <span class="num">{{ '%.1f' | format(idx) }}x</span> their format median across {{ n }} videos.</li>{% endfor %}
-  </ul>
+  {{ ui.patterns(winners) }}
   {% endif %}
 
   <div class="chips" role="navigation" aria-label="Filter by format">

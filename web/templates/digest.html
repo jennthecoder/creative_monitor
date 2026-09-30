@@ -26,9 +26,16 @@
   <h1 class="title">Week of {{ d.week_start | dt('%d %B') }}</h1>
   <p class="headline">{{ d.headline }}</p>
   <p class="meta num">{{ d.total_new }} new creative{{ 's' if d.total_new != 1 }} across {{ d.brands | length }} channel{{ 's' if d.brands | length != 1 }}
-    · every “x” compares a video with its own channel’s median for the same format
+    · every “x” compares a video with its own channel’s median for the same format, at day 7 where the history allows
     {% if not is_current %}· <span title="Metrics are stored per run; past weeks are re-scored with the latest counts">views as of the latest run</span>{% endif %}
     · <a class="link" href="{{ url_for('digest_page', week=prev_week) }}">Previous week</a></p>
+
+  {% if d.cross_channel %}
+  <aside class="shift">
+    <b>Holding across channels</b>
+    <ul class="working">{% for x in d.cross_channel %}<li><b>{{ x.label | capitalize }}:</b> <span class="num">{{ x.text }}</span>.</li>{% endfor %}</ul>
+  </aside>
+  {% endif %}
 
   {% for b in d.brands %}
   <section class="brand" id="{{ b.slug }}">
@@ -47,11 +54,7 @@
     {% endif %}
 
     {% if b.winners %}
-    <ul class="working">
-      {% for attr, idx, n in b.winners %}
-      <li><b>What’s working:</b> {{ attr }} videos run at <span class="num">{{ '%.1f' | format(idx) }}x</span> their format median across {{ n }} videos.</li>
-      {% endfor %}
-    </ul>
+    {{ ui.patterns(b.winners) }}
     {% endif %}
 
     {% if b.leaders %}
