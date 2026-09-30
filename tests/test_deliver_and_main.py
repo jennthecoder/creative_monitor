@@ -107,3 +107,26 @@ def test_quota_failure_exits_1_and_records_run(env):
     assert conn.execute("SELECT COUNT(*) FROM videos").fetchone()[0] == 0
     r = conn.execute("SELECT status, message FROM runs").fetchone()
     assert r["status"] == "failed" and "quota" in r["message"]
+
+
+def test_daily_stats_refresh_then_weekly_run_classifies(env):
+    assert main.refresh_stats() == 0
+    conn = _connect(env.db)
+    q = lambda sql: conn.execute(sql).fetchone()[0]
+    assert q("SELECT COUNT(*) FROM videos") == 30
+    assert q("SELECT COUNT(*) FROM metrics") == 30
+    assert q("SELECT COUNT(*) FROM classifications") == 0
+    assert env.claude.calls == 0                      # YouTube only, no LLM
+    r = conn.execute("SELECT status, message FROM runs").fetchone()
+    assert r["status"] == "ok" and r["message"].startswith("stats refresh")
+    assert not list((env.tmp / "reports").glob("digest-*.md"))
+
+    assert main.run() == 0                            # weekly run picks up the backlog
+    assert q("SELECT COUNT(*) FROM classifications") == 29
+
+
+def test_daily_stats_refresh_failure_leaves_state(env):
+    env.yt.quota_after = 0
+    assert main.refresh_stats() == 1
+    conn = _connect(env.db)
+    assert conn.execute("SELECT COUNT(*) FROM videos").fetchone()[0] == 0

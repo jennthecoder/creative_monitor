@@ -1,6 +1,10 @@
 """Weekly run: fetch -> classify -> measure -> synthesise -> report -> deliver.
 
     python -m src.main [--skip-synthesis] [--no-deliver]
+    python -m src.main --stats-only     # daily: new uploads + view snapshots, no LLM
+
+Daily snapshots give every video an exact day-7 reading, which the performance
+index compares on. New uploads found daily are classified by the next weekly run.
 
 Exit code 1 if the fetch stage fails (state untouched); per-video classification
 or synthesis failures are counted in the run's error total and never fail the run.
@@ -123,13 +127,37 @@ def run(skip_synthesis: bool = False, no_deliver: bool = False) -> int:
     return 0
 
 
+def refresh_stats() -> int:
+    """Discover new uploads and snapshot view/like/comment counts. YouTube only
+    (a few quota units per channel); classification and synthesis wait for the
+    weekly run, which picks up anything left unclassified."""
+    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+    conn = store.connect()
+    run_id = store.start_run(conn)
+    try:
+        yt = fetch.YouTubeClient(os.getenv("YOUTUBE_API_KEY", ""))
+        result = fetch.run_fetch(conn, yt, load_brands())
+    except fetch.YouTubeError as e:
+        conn.rollback()
+        log.error("Stats refresh failed, state left untouched: %s", e)
+        store.finish_run(conn, run_id, 0, 0, 1, status="failed", message=f"stats refresh: {e}")
+        return 1
+    store.finish_run(conn, run_id, len(result.new_videos), 0, 0, status="ok",
+                     message=f"stats refresh: {result.refreshed} videos, {yt.units_used} units")
+    log.info("Stats refresh: %d new videos, %d snapshots, %d YouTube units",
+             len(result.new_videos), result.refreshed, yt.units_used)
+    return 0
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--skip-synthesis", action="store_true")
     p.add_argument("--no-deliver", action="store_true")
+    p.add_argument("--stats-only", action="store_true",
+                   help="daily refresh: new uploads and view snapshots, no LLM, no digest")
     a = p.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    sys.exit(run(a.skip_synthesis, a.no_deliver))
+    sys.exit(refresh_stats() if a.stats_only else run(a.skip_synthesis, a.no_deliver))
 
 
 if __name__ == "__main__":

@@ -1,0 +1,43 @@
+name: Daily stats refresh
+
+# New uploads + a view/like/comment snapshot for recent videos, every day except
+# Monday (the weekly run does the same fetch). Daily snapshots give each video an
+# exact day-7 reading. YouTube API only: no OpenAI calls, no digest.
+on:
+  schedule:
+    - cron: "0 13 * * 0,2-6"   # 13:00 UTC, Tue–Sun
+  workflow_dispatch:
+
+permissions:
+  contents: write   # commit data/monitor.db back to the repo
+
+concurrency:
+  group: creative-monitor   # shared with the weekly run so they never overlap
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Refresh stats
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+        run: python -m src.main --stats-only
+
+      - name: Commit updated state
+        run: |
+          git config user.name "creative-monitor-bot"
+          git config user.email "creative-monitor-bot@users.noreply.github.com"
+          git add data/monitor.db
+          git diff --cached --quiet || git commit -m "Daily stats $(date -u +%F)"
+          git push

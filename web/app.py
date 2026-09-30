@@ -119,7 +119,7 @@ def brand_page(slug):
         "brand.html", brand=b, slug=slug, weeks=weeks, fmt=fmt, total=len(videos),
         baselines={k: digest.fmt_views(int(v)) if v else None for k, v in baselines.items()},
         counts=counts, bucket_names=digest.BUCKET_NAMES,
-        winners=digest.attribute_winners(videos, scores, rubric),
+        winners=digest.attribute_patterns(videos, scores, rubric),
         shift=digest.detect_shift(videos, rubric),
         trend=digest.publishing_trend(videos, now - timedelta(days=7)))
 
@@ -137,12 +137,13 @@ def video_page(video_id):
     c = digest.card(this, scores, rubric, now)
     s = scores.get(video_id)
     baseline = digest.fmt_views(int(s.baseline)) if s and s.baseline else None
+    age_matched_base = any(x.age_matched for x in scores.values() if s and x.bucket == s.bucket)
     history = [dict(r) for r in conn.execute(
         "SELECT measured_at, views, likes, comment_count FROM metrics WHERE video_id = ? "
         "ORDER BY measured_at DESC", (video_id,))]
     more = [digest.card(x, scores, rubric, now) for x in videos if x["video_id"] != video_id][:12]
     q = conn.execute("SELECT reason FROM quarantine WHERE video_id = ?", (video_id,)).fetchone()
-    return render_template("video.html", c=c, baseline=baseline, history=history, more=more,
+    return render_template("video.html", c=c, baseline=baseline, age_matched_base=age_matched_base, history=history, more=more,
                            quarantine=q["reason"] if q else None,
                            rubric_matches=(c["rubric_version"] in (None, rubric["version"])))
 

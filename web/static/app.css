@@ -154,6 +154,9 @@ h1.title { font-size: 36px; line-height: 44px; font-weight: 700; letter-spacing:
 .working { color: var(--ink-2); margin: 8px 0 0; padding: 0; list-style: none; }
 .working li { margin: 4px 0; }
 .working b { color: var(--ink); font-weight: 500; }
+.working .note { color: var(--ink-3); font-size: 12px; }
+.read { font-size: 13px; color: var(--ink-2); margin-top: 6px; }
+.read b { color: var(--ink); font-weight: 500; }
 
 /* --- creative card (compact row: YouTube search-result layout) ---------- */
 .card { display: grid; grid-template-columns: 360px 1fr; gap: 16px; padding: 12px 0; }

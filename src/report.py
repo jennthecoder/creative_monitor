@@ -19,6 +19,8 @@ def _verdict_md(c: dict) -> str:
     if c["chips"]:
         body.append(" · ".join(ch["label"] for ch in c["chips"]) +
                     (" *(low confidence)*" if c["confidence"] == "low" else ""))
+    if c["read"]:
+        body.append(f"*{c['read']['label']}:* {c['read']['text']}")
     if c["theme_line"]:
         body.append(c["theme_line"])
     return "  \n".join([head] + body)  # markdown hard line breaks
@@ -39,6 +41,9 @@ def render(d: dict) -> str:
     out = [f"## Week of {d['week_start'].date():%d %b %Y}",
            f"**{d['headline']}**",
            f"{d['total_new']} new videos across {len(d['brands'])} brands."]
+    if d["cross_channel"]:
+        out.append("**Holding across channels:** " + "; ".join(
+            f"{x['label']} ({x['text']})" for x in d["cross_channel"]) + ".")
 
     for b in d["brands"]:
         mix = ", ".join(f"{n} {k}" for k, n in b["mix"])
@@ -46,9 +51,9 @@ def render(d: dict) -> str:
                  f"{'s' if b['new_count'] != 1 else ''} this week" + (f" ({mix})" if mix else "")]
         for c in b["verdicts"]:
             lines += [_verdict_md(c), ""]
-        for attr, idx, n in b["winners"]:
-            lines.append(f"**What's working for {b['name']}:** {attr} videos run at "
-                         f"{idx:.1f}x their format median ({n} videos).")
+        for p in b["winners"]:
+            also = f" Also holds on {', '.join(p['confirmed_by'])}." if p["confirmed_by"] else ""
+            lines.append(f"**What's working for {b['name']}:** {p['label']} — {p['text']}.{also}")
         if b["shift"]:
             lines.append(f"**Shift worth noting:** {b['shift']['text']}")
         if b["leaders"]:

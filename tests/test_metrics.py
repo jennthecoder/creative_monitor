@@ -95,3 +95,63 @@ def test_bucket_boundary():
 
 def test_hidden_likes_engagement_is_none():
     assert metrics.engagement_rate(1000, None, 5) is None
+
+
+# --- age matching --------------------------------------------------------
+
+def _snap(day):
+    return datetime(2026, 9, day, 12, tzinfo=timezone.utc)
+
+
+def test_views_at_age_interpolates_between_snapshots():
+    pub = datetime(2026, 9, 1, 12, tzinfo=timezone.utc).isoformat()
+    # seen at day 4 (400 views) and day 11 (1100 views) -> day 7 = 700
+    assert metrics.views_at_age(pub, [(_snap(5), 400), (_snap(12), 1100)]) == pytest.approx(700)
+
+
+def test_views_at_age_uses_snapshot_near_day_7():
+    pub = datetime(2026, 9, 1, 12, tzinfo=timezone.utc).isoformat()
+    assert metrics.views_at_age(pub, [(_snap(8), 900), (_snap(15), 5000)]) == 900
+
+
+def test_views_at_age_none_when_first_seen_later():
+    pub = datetime(2026, 9, 1, 12, tzinfo=timezone.utc).isoformat()
+    assert metrics.views_at_age(pub, [(_snap(20), 900)]) is None
+
+
+def seed_history(conn, brand, vid, pub, snaps, likes=None, comments=None):
+    """snaps: list of (date 'YYYY-MM-DD', views)"""
+    store.insert_video(conn, {"video_id": vid, "brand": brand, "published_at": pub.isoformat()})
+    for day, views in snaps:
+        store.save_metrics(conn, vid, views, likes if likes is not None else views // 20,
+                           comments if comments is not None else views // 100, measured_at=day)
+
+
+def test_day_7_comparison_removes_age_bias(tmp_path):
+    """Five videos all had 1000 views at day 7. The oldest has since grown to 9000,
+    which today's totals would call a breakout; at day 7 it is exactly on par."""
+    c = store.connect(tmp_path / "t.db")
+    for i in range(5):
+        pub = NOW - timedelta(days=14 + i, hours=12)
+        seed_history(c, "D", f"v{i}", pub, [
+            ((pub + timedelta(days=7)).date().isoformat(), 1000),
+            ("2026-09-30", 9000 if i == 4 else 1500)])
+    s = metrics.score_brand(c, "D", NOW)
+    assert s["v4"].age_matched and s["v4"].view_index == pytest.approx(1.0)
+    assert s["v4"].baseline == 1000
+
+
+def test_falls_back_to_totals_until_enough_day_7_readings(conn):
+    s = metrics.score_brand(conn, "A", NOW)  # single snapshot -> no day-7 readings
+    assert not s["a3"].age_matched and s["a3"].view_index == pytest.approx(1.0)
+
+
+# --- engagement -----------------------------------------------------------
+
+def test_like_and_comment_rates_indexed_against_channel(conn):
+    s = metrics.score_brand(conn, "A", NOW)
+    # like rates of eligible videos: .04, .025, .02, .009, .0025 -> median .02
+    assert s["a1"].like_rate == pytest.approx(0.04)
+    assert s["a1"].like_index == pytest.approx(2.0)
+    assert s["a1"].comment_rate == pytest.approx(0.01)
+    assert s["a1"].engagement_index is not None
