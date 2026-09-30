@@ -108,8 +108,13 @@ def brand_page(slug):
     cards = [digest.card(v, scores, rubric, now) for v in videos]
     if fmt in BUCKETS:
         cards = [c for c in cards if c["bucket"] == fmt]
+    sort = request.args.get("sort") if request.args.get("sort") in ("best", "weakest") else None
+    if sort:
+        # Judged videos only: an under-7-day index is still moving.
+        cards = sorted([c for c in cards if c["index"] is not None and not c["too_early"]],
+                       key=lambda c: c["index"], reverse=(sort == "best"))
     weeks: dict[str, list] = {}
-    for c in cards:
+    for c in cards if not sort else []:
         p = datetime.fromisoformat(c["published_at"].replace("Z", "+00:00"))
         monday = (p - timedelta(days=p.weekday())).date()
         weeks.setdefault(monday.isoformat(), []).append(c)
@@ -117,6 +122,7 @@ def brand_page(slug):
     counts = {k: sum(1 for s in scores.values() if s.bucket == k) for k in BUCKETS}
     return render_template(
         "brand.html", brand=b, slug=slug, weeks=weeks, fmt=fmt, total=len(videos),
+        sort=sort, sorted_cards=cards if sort else [],
         baselines={k: digest.fmt_views(int(v)) if v else None for k, v in baselines.items()},
         counts=counts, bucket_names=digest.BUCKET_NAMES,
         winners=digest.attribute_patterns(videos, scores, rubric),

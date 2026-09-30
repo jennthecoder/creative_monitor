@@ -17,31 +17,37 @@
           <div class="meta">{{ c.bucket_singular | capitalize if c.bucket_singular }}{{ ' · ' ~ c.duration if c.duration }}</div></div>
       </div>
 
-      <div class="desc">
-        <div class="meta num">{{ '{:,}'.format(c.views) if c.views is not none else '—' }} views · {{ c.published_at | dt('%d %b %Y') }} · {{ c.ago }}</div>
-        {% if c.index is not none %}
-        {{ ui.perf(c, 'lg') }}
-        {{ ui.read(c) }}
-        <div class="meta num" style="font-weight:400;color:var(--ink-2)">Channel median for {{ c.bucket_singular }}s: {{ baseline }} views{{ ' at day 7' if c.age_matched or c.too_early and age_matched_base }}{% if not c.age_matched and not c.too_early %} · compares today’s totals, not views at the same age{% endif %}{% if c.too_early %} · under 7 days old, so this number is still moving{% endif %}</div>
-        {% else %}
-        <p class="meta" style="font-weight:400;color:var(--ink-2)">No baseline yet for this channel’s {{ c.bucket_singular }}s.</p>
-        {% endif %}
-
-        <dl class="num">
-          <dt>Engagement</dt><dd>{{ c.engagement_text }}{% if c.engagement is not none %} · {{ c.engagement_index_text }} channel norm{% endif %}</dd>
-          <dt>Like rate</dt><dd>{{ c.like_rate_text }}{% if c.like_rate_text != 'hidden' %} · {{ c.like_index_text }} channel norm{% endif %}</dd>
-          <dt>Comment rate</dt><dd>{{ c.comment_rate_text }}{% if c.comment_rate_text != 'off' %} · {{ c.comment_index_text }} channel norm{% endif %}</dd>
-          {% if c.classified %}
-          {% for ch in c.chips %}<dt>{{ ch.dim }}</dt><dd>{{ ch.value }}</dd>{% endfor %}
-          <dt>Confidence</dt><dd>{{ c.confidence }}</dd>
+      {# Scorecard: performance first, then the engagement that explains it. #}
+      <section class="scorecard">
+        <div class="score-main">
+          <span class="label">Performance</span>
+          {% if c.index is not none %}
+          {{ ui.perf(c, 'lg') }}
+          <p class="meta num">{{ '{:,}'.format(c.views) if c.views is not none else '—' }} views against a {{ c.bucket_singular }} median of {{ baseline }}{{ ' at day 7' if c.age_matched or c.too_early and age_matched_base }}.
+            {% if c.too_early %}Under 7 days old, so this is still moving.{% elif not c.age_matched %}Compares today’s totals, not views at the same age.{% endif %}</p>
+          {% else %}
+          <p class="meta">No baseline yet for this channel’s {{ c.bucket_singular }}s.</p>
           {% endif %}
-        </dl>
+          {{ ui.read(c) }}
+        </div>
+        <div class="stats">
+          {{ ui.stat('Engagement', c.engagement_text, (c.engagement_index_text ~ ' channel norm') if c.engagement is not none else '') }}
+          {{ ui.stat('Like rate', c.like_rate_text, (c.like_index_text ~ ' channel norm') if c.like_rate_text != 'hidden' else '') }}
+          {{ ui.stat('Comment rate', c.comment_rate_text, (c.comment_index_text ~ ' channel norm') if c.comment_rate_text != 'off' else '') }}
+          {{ ui.stat('Published', c.published_at | dt('%d %b %Y'), c.ago) }}
+        </div>
+      </section>
+
+      <section class="block">
+        <h2 class="sh">Creative attributes {% if c.classified %}<span class="note">{{ c.confidence }} confidence{{ ' · rubric ' ~ c.rubric_version if c.rubric_version }}</span>{% endif %}</h2>
+        {% if c.classified %}
+        <div class="attr-grid">{% for ch in c.chips %}<div><span>{{ ch.dim }}</span><b>{{ ch.value }}</b></div>{% endfor %}</div>
         {% if c.rationale %}<p class="rationale"><b>Why it was tagged this way:</b> {{ c.rationale }}</p>{% endif %}
+        {% else %}<p class="meta">Not classified yet.</p>{% endif %}
         {{ ui.lowconf(c) }}
         {% if quarantine %}<p class="lowconf">Set aside — couldn’t be classified: {{ quarantine }}</p>{% endif %}
-        {% if c.rubric_version and not rubric_matches %}<p class="meta" style="font-weight:400;color:var(--ink-2)">Tagged with rubric version {{ c.rubric_version }}, which differs from the current rubric.</p>
-        {% elif c.rubric_version %}<p class="meta" style="font-weight:400;color:var(--ink-3);font-size:12px">Rubric {{ c.rubric_version }}</p>{% endif %}
-      </div>
+        {% if c.rubric_version and not rubric_matches %}<p class="meta">Tagged with rubric version {{ c.rubric_version }}, which differs from the current rubric.</p>{% endif %}
+      </section>
 
       {{ ui.themes(c.themes, c.comments_off) }}
 

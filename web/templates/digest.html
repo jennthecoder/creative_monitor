@@ -17,48 +17,84 @@
 <div class="page">
   {{ ui.run_banner(d.last_run) if is_current }}
 
-  <div class="chips" role="navigation" aria-label="Jump to channel">
-    <a class="chip on" href="#top">All</a>
-    {% for b in d.brands %}<a class="chip" href="#{{ b.slug }}">{{ b.name }}</a>{% endfor %}
-  </div>
+  {# 1. The story #}
+  <header class="dhead" id="top">
+    <div class="eyebrow num">Weekly digest · {{ d.week_start | dt('%d %b') }} – {{ d.week_end | dt('%d %b %Y') }}</div>
+    <h1 class="headline">{{ d.headline }}</h1>
+    <p class="meta num">{{ d.total_new }} new video{{ 's' if d.total_new != 1 }} across {{ d.brands | length }} channel{{ 's' if d.brands | length != 1 }}
+      <span class="method" tabindex="0" title="Every “x” compares a video with its own channel’s median for the same format (Short, clip or full episode), at day 7 where the history allows. Red marks 1.5x or better.">How to read the numbers</span>
+      {% if not is_current %}· <span title="Metrics are stored per run; past weeks are re-scored with the latest counts">views as of the latest run</span>{% endif %}</p>
+  </header>
 
-  <div id="top" class="eyebrow">Weekly digest</div>
-  <h1 class="title">Week of {{ d.week_start | dt('%d %B') }}</h1>
-  <p class="headline">{{ d.headline }}</p>
-  <p class="meta num">{{ d.total_new }} new creative{{ 's' if d.total_new != 1 }} across {{ d.brands | length }} channel{{ 's' if d.brands | length != 1 }}
-    · every “x” compares a video with its own channel’s median for the same format, at day 7 where the history allows
-    {% if not is_current %}· <span title="Metrics are stored per run; past weeks are re-scored with the latest counts">views as of the latest run</span>{% endif %}
-    · <a class="link" href="{{ url_for('digest_page', week=prev_week) }}">Previous week</a></p>
+  {# 2. At a glance: one card per channel, side by side #}
+  <section class="glance" aria-label="At a glance">
+    {% for b in d.brands %}
+    {% set top = b.verdicts | selectattr('verdict', 'equalto', 'Outperforming') | first %}
+    {% set miss = b.verdicts | selectattr('verdict', 'equalto', 'Underperforming') | first %}
+    <a class="gcard" href="#{{ b.slug }}">
+      <div class="ghead">
+        <span class="avatar lg">{{ initials(b.name) }}</span>
+        <div><h2>{{ b.name }}</h2>
+          <span class="meta num">{{ b.new_count }} new{% if b.mix %} · {% for k, n in b.mix %}{{ n }} {{ k }}{{ ', ' if not loop.last }}{% endfor %}{% endif %}</span></div>
+      </div>
+      <dl>
+        {% if top %}<dt>Top breakout</dt><dd><b class="idx out num">{{ top.index_text }}</b><span>{{ top.title }}</span></dd>{% endif %}
+        {% if miss %}<dt>Biggest miss</dt><dd><b class="idx num">{{ miss.index_text }}</b><span>{{ miss.title }}</span></dd>{% endif %}
+        {% if b.winners %}<dt>Working</dt><dd><b class="idx num">{{ b.winners[0].hits }}/{{ b.winners[0].n }}</b><span>{{ b.winners[0].label | capitalize }}</span></dd>{% endif %}
+        {% if b.shift %}<dt>Shift</dt><dd><b class="idx num">{{ b.shift.recent }}/{{ b.shift.window }}</b><span>Leaning into {{ b.shift.label }}</span></dd>{% endif %}
+        {% if not (top or miss or b.winners or b.shift) %}<dt>This week</dt><dd><span>Nothing moved far from the channel’s norm.</span></dd>{% endif %}
+      </dl>
+      {{ ui.trend(b.trend) }}
+    </a>
+    {% endfor %}
+  </section>
 
+  {# 3. Insights that hold on more than one channel are the strongest evidence #}
   {% if d.cross_channel %}
-  <aside class="shift">
-    <b>Holding across channels</b>
-    <ul class="working">{% for x in d.cross_channel %}<li><b>{{ x.label | capitalize }}:</b> <span class="num">{{ x.text }}</span>.</li>{% endfor %}</ul>
-  </aside>
+  <section class="block">
+    <h2 class="sh">Holding across channels</h2>
+    <div class="pgrid">
+      {% for x in d.cross_channel %}
+      <article class="pcard">
+        <div class="pstat num"><b>{{ x.hits }}</b><span>/{{ x.n }}</span></div>
+        <h4>{{ x.label | capitalize }}</h4>
+        <p class="num">{{ x.text }}.</p>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
   {% endif %}
 
+  {# 4. Each channel: insight → evidence → early signal #}
   {% for b in d.brands %}
+  {% set outs = b.verdicts | selectattr('verdict', 'equalto', 'Outperforming') | list %}
+  {% set rest = b.verdicts | rejectattr('verdict', 'equalto', 'Outperforming') | list %}
   <section class="brand" id="{{ b.slug }}">
     <div class="brand-head">
       <span class="avatar lg">{{ initials(b.name) }}</span>
       <h2><a href="{{ url_for('brand_page', slug=b.slug) }}">{{ b.name }}</a></h2>
-      <span class="count num">{{ b.new_count }} new{% if b.mix %} · {% for k, n in b.mix %}{{ n }} {{ k }}{{ ', ' if not loop.last }}{% endfor %}{% endif %}</span>
       {{ ui.trend(b.trend) }}
     </div>
 
     {% if b.shift %}{{ ui.shift(b.shift) }}{% endif %}
 
-    {% if b.verdicts %}
-    <div class="subhead">Now judgeable <span class="note">crossed 7 days old this week</span></div>
-    {% for c in b.verdicts %}{{ ui.card(c) }}{% endfor %}
-    {% endif %}
-
     {% if b.winners %}
+    <h3 class="sh">What’s working <span class="note">share of videos with this attribute that beat 1.5x their format median</span></h3>
     {{ ui.patterns(b.winners) }}
     {% endif %}
 
+    {% if outs %}
+    <h3 class="sh">Breakouts <span class="note">crossed 7 days old this week</span></h3>
+    {% for c in outs %}{{ ui.feature(c) }}{% endfor %}
+    {% endif %}
+
+    {% if rest %}
+    <h3 class="sh">{{ 'Misses' if rest[0].verdict == 'Underperforming' else 'On par' }} <span class="note">crossed 7 days old this week</span></h3>
+    <div class="rows">{% for c in rest %}{{ ui.row(c, with_audience=True) }}{% endfor %}</div>
+    {% endif %}
+
     {% if b.leaders %}
-    <div class="subhead">Just launched <span class="note">under 7 days — early signal only</span></div>
+    <h3 class="sh">Just launched <span class="note">under 7 days — early signal only</span></h3>
     {% if b.launched_pattern %}<p class="pattern">Mostly {{ b.launched_pattern }}.</p>{% endif %}
     <div class="grid">{% for c in b.leaders %}{{ ui.tile(c) }}{% endfor %}</div>
     {% if b.launched_more %}<a class="more link" href="{{ url_for('brand_page', slug=b.slug) }}">See all {{ b.new_count }} from this week</a>{% endif %}

@@ -24,6 +24,7 @@
   --line: rgba(0, 0, 0, 0.1);
   --radius-thumb: 12px;
   --radius-panel: 12px;
+  --card-line: rgba(0, 0, 0, 0.08);
   --mast: 56px;
   --guide: 240px;
   --font: "Roboto", "Arial", sans-serif;
@@ -93,7 +94,7 @@ img { display: block; max-width: 100%; }
   display: grid; place-items: center; font-size: 10px; font-weight: 500; flex-shrink: 0;
 }
 .avatar.lg { width: 36px; height: 36px; font-size: 13px; }
-.avatar.xl { width: 120px; height: 120px; font-size: 40px; font-weight: 400; }
+.avatar.xl { width: 88px; height: 88px; font-size: 30px; font-weight: 400; }
 
 main { flex: 1; min-width: 0; padding: 8px 24px 64px; }
 .page { max-width: 1040px; }
@@ -112,10 +113,32 @@ main { flex: 1; min-width: 0; padding: 8px 24px 64px; }
 /* --- digest header ----------------------------------------------------- */
 .eyebrow { color: var(--ink-2); font-size: 12px; letter-spacing: 0.3px; text-transform: uppercase; font-weight: 500; }
 h1.title { font-size: 36px; line-height: 44px; font-weight: 700; letter-spacing: -0.5px; margin: 16px 0 4px; }
+.dhead { padding: 16px 0 8px; }
 .headline {
-  font-size: 26px; line-height: 36px; font-weight: 400; letter-spacing: -0.2px;
-  margin: 20px 0 12px; max-width: 30em; text-wrap: pretty;
+  font-size: 30px; line-height: 38px; font-weight: 700; letter-spacing: -0.5px;
+  margin: 10px 0 12px; max-width: 26em; text-wrap: pretty;
 }
+.method { margin-left: 8px; color: var(--ink-2); border-bottom: 1px dotted var(--ink-3); cursor: help; }
+
+/* section heading: one style for every "what's working / breakouts / misses" */
+.sh { font-size: 18px; line-height: 24px; font-weight: 700; margin: 36px 0 14px; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.sh .note { color: var(--ink-3); font-weight: 400; font-size: 13px; }
+.block { margin-top: 8px; }
+
+/* --- at a glance: channels side by side -------------------------------- */
+.glance { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 16px; margin: 24px 0 8px; }
+.gcard { min-width: 0; display: flex; flex-direction: column; gap: 14px; border: 1px solid var(--card-line); border-radius: var(--radius-panel); padding: 18px 20px; transition: border-color .15s, box-shadow .15s; }
+.gcard:hover { border-color: var(--ink-3); box-shadow: 0 2px 10px rgba(0,0,0,.06); }
+.ghead { display: flex; gap: 12px; align-items: center; }
+.ghead h2 { font-size: 16px; line-height: 22px; margin: 0; font-weight: 700; }
+.ghead .meta { font-size: 12px; }
+.gcard dl { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px 12px; margin: 0; }
+.gcard dt { color: var(--ink-2); font-size: 12px; padding-top: 3px; }
+.gcard dd { margin: 0; display: flex; gap: 10px; align-items: baseline; min-width: 0; }
+.gcard dd span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.gcard .idx { font-size: 16px; font-weight: 700; min-width: 3.2em; flex-shrink: 0; }
+.gcard .idx.out { color: var(--accent-out); }
+.gcard .trend { margin: 0; padding-top: 12px; border-top: 1px solid var(--line); }
 .meta { color: var(--ink-2); font-size: 14px; }
 .meta a.link { font-weight: 500; }
 
@@ -128,9 +151,9 @@ h1.title { font-size: 36px; line-height: 44px; font-weight: 700; letter-spacing:
 .banner .sub { color: var(--ink-2); font-size: 13px; }
 
 /* --- brand section ----------------------------------------------------- */
-.brand { margin-top: 48px; }
-.brand-head { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
-.brand-head h2 { font-size: 20px; line-height: 28px; font-weight: 700; margin: 0; }
+.brand { margin-top: 56px; padding-top: 28px; border-top: 1px solid var(--line); }
+.brand-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.brand-head h2 { font-size: 24px; line-height: 32px; font-weight: 700; margin: 0; letter-spacing: -0.3px; }
 .brand-head h2 a:hover { text-decoration: underline; }
 .brand-head .count { color: var(--ink-2); }
 .trend { margin-left: auto; color: var(--ink-2); font-size: 13px; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
@@ -142,7 +165,7 @@ h1.title { font-size: 36px; line-height: 44px; font-weight: 700; letter-spacing:
 /* --- shift callout: the highest-value content, set apart by tint + scale -- */
 .shift {
   background: var(--surface); border-radius: var(--radius-panel);
-  padding: 20px 24px; margin: 24px 0 8px; display: grid; grid-template-columns: auto 1fr; gap: 4px 16px;
+  padding: 18px 22px; margin: 20px 0 4px; display: grid; grid-template-columns: auto 1fr; gap: 4px 16px;
 }
 .shift .tag { grid-row: span 2; font-size: 11px; font-weight: 500; letter-spacing: 0.6px; text-transform: uppercase; color: var(--ink-2); padding-top: 5px; }
 .shift p { margin: 0; font-size: 18px; line-height: 26px; }
@@ -151,12 +174,67 @@ h1.title { font-size: 36px; line-height: 44px; font-weight: 700; letter-spacing:
 .shift .dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--track); display: inline-block; }
 .shift .dots i.f { background: var(--ink); }
 
-.working { color: var(--ink-2); margin: 8px 0 0; padding: 0; list-style: none; }
-.working li { margin: 4px 0; }
-.working b { color: var(--ink); font-weight: 500; }
-.working .note { color: var(--ink-3); font-size: 12px; }
-.read { font-size: 13px; color: var(--ink-2); margin-top: 6px; }
-.read b { color: var(--ink); font-weight: 500; }
+/* --- pattern cards: the insight, stated as a stat ----------------------- */
+.pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr)); gap: 12px; }
+.pcard { background: var(--surface); border-radius: var(--radius-panel); padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; }
+.pstat { display: flex; align-items: baseline; }
+.pstat b { font-size: 32px; line-height: 36px; font-weight: 700; letter-spacing: -0.5px; }
+.pstat span { font-size: 16px; color: var(--ink-2); margin-left: 2px; }
+.pcard h4 { margin: 0; font-size: 15px; font-weight: 500; }
+.pcard p { margin: 2px 0 0; color: var(--ink-2); font-size: 12px; line-height: 17px; }
+.pbar { position: relative; height: 6px; border-radius: 3px; background: var(--track); margin-top: 6px; }
+.pbar .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--ink); }
+.pbar .mark { position: absolute; top: -4px; width: 2px; height: 14px; margin-left: -1px; background: var(--ink-3); border-radius: 1px; }
+.pnote { color: var(--ink-3); font-size: 11px; }
+.pcard .pill { align-self: flex-start; margin-top: 4px; }
+
+/* --- pills: reach vs resonance ------------------------------------------ */
+.pill { display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 11px; font-size: 12px; font-weight: 500; white-space: nowrap; background: var(--chip); color: var(--ink); }
+.pill.both { background: var(--ink); color: #fff; }
+.pill.packaging, .pill.underpackaged { background: none; box-shadow: inset 0 0 0 1px var(--ink-3); }
+.read { display: flex; gap: 8px; align-items: baseline; margin-top: 10px; font-size: 13px; color: var(--ink-2); line-height: 18px; }
+.read .pill { flex-shrink: 0; }
+.audience { display: flex; gap: 8px; margin-top: 12px; font-size: 13px; line-height: 18px; color: var(--ink-2); }
+.audience b { flex-shrink: 0; font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.4px; color: var(--ink); padding-top: 1px; }
+.audience span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* --- breakout (feature) card ------------------------------------------- */
+.feat { display: grid; grid-template-columns: 320px 1fr; gap: 20px; padding: 16px 0; }
+.feat + .feat { border-top: 1px solid var(--line); }
+.feat .body { min-width: 0; }
+.feat h3 { margin: 4px 0 0; font-size: 17px; line-height: 24px; font-weight: 500;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.feat .meta { font-size: 12px; margin-top: 2px; }
+.feat .perf { margin-top: 0; }
+
+/* --- compact row: misses, channel list ---------------------------------- */
+.rows { display: flex; flex-direction: column; }
+.row { display: grid; grid-template-columns: 168px 1fr 200px; gap: 16px; padding: 10px 0; align-items: start; }
+.row + .row { border-top: 1px solid var(--line); }
+.row .body { min-width: 0; }
+.row h3 { margin: 0; font-size: 14px; line-height: 20px; font-weight: 500;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.row .meta { font-size: 12px; margin-top: 2px; }
+.row .attrs { margin-top: 8px; }
+.row .aside { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.row .aside .perf { margin: 0; }
+.row .aside .perf .fig { font-size: 16px; min-width: 3em; }
+.row .aside .perf .scale { width: 110px; }
+.row .audience { margin-top: 8px; }
+
+/* --- stat tiles --------------------------------------------------------- */
+.stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin: 20px 0 8px; }
+.stat { background: var(--surface); border-radius: var(--radius-panel); padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+.stat .label { color: var(--ink-2); font-size: 12px; }
+.stat b { font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: -0.3px; }
+.stat .sub { color: var(--ink-2); font-size: 12px; }
+
+/* --- channel toolbar ---------------------------------------------------- */
+.toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.toolbar .chips { padding: 0; }
+.seg { display: inline-flex; background: var(--chip); border-radius: 8px; padding: 3px; }
+.seg a { padding: 5px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; color: var(--ink-2); }
+.seg a.on { background: var(--bg); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.1); }
 
 /* --- creative card (compact row: YouTube search-result layout) ---------- */
 .card { display: grid; grid-template-columns: 360px 1fr; gap: 16px; padding: 12px 0; }
@@ -195,7 +273,9 @@ h1.title { font-size: 36px; line-height: 44px; font-weight: 700; letter-spacing:
 .perf.early .fill { background: repeating-linear-gradient(90deg, var(--ink-3) 0 3px, transparent 3px 5px); }
 .perf.early .fig { color: var(--ink-2); font-weight: 400; }
 .perf.lg .scale { width: 280px; }
-.perf.lg .fig { font-size: 32px; line-height: 36px; }
+.perf.lg .fig { font-size: 40px; line-height: 44px; font-weight: 700; letter-spacing: -0.5px; }
+.perf.md .fig { font-size: 26px; line-height: 30px; font-weight: 700; }
+.perf.md .scale { width: 220px; }
 
 /* --- attribute chips: quiet, categorical, one neutral treatment ---------- */
 .attrs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
@@ -203,12 +283,13 @@ h1.title { font-size: 36px; line-height: 44px; font-weight: 700; letter-spacing:
 .attr i { font-style: normal; color: var(--ink-3); font-size: 11px; }
 
 /* --- just launched: YouTube home-grid ---------------------------------- */
-.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 16px; }
-.tile h4 { margin: 12px 0 0; font-size: 16px; line-height: 22px; font-weight: 500;
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px 16px; }
+.tile h4 { margin: 10px 0 0; font-size: 14px; line-height: 20px; font-weight: 500;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .tile .meta { font-size: 13px; margin-top: 4px; }
-.tile .early { font-size: 12px; color: var(--ink-3); margin-top: 2px; font-variant-numeric: tabular-nums; }
-.pattern { color: var(--ink-2); margin: -4px 0 16px; }
+.tile .early { font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+.tile .attrs { margin-top: 8px; }
+.pattern { color: var(--ink-2); margin: -6px 0 14px; font-size: 13px; }
 .more { display: inline-block; margin-top: 12px; }
 
 .quiet { color: var(--ink-2); padding: 24px 0; display: flex; gap: 12px; align-items: center; }
@@ -227,14 +308,8 @@ h1.title { font-size: 36px; line-height: 44px; font-weight: 700; letter-spacing:
 .chan-head { display: flex; gap: 24px; align-items: center; margin: 24px 0 8px; }
 .chan-head h1 { font-size: 36px; line-height: 44px; margin: 0; font-weight: 700; }
 .chan-head .meta { margin-top: 4px; }
-.baselines { display: flex; gap: 32px; margin: 20px 0 8px; flex-wrap: wrap; }
-.baselines div { display: flex; flex-direction: column; }
-.baselines b { font-size: 20px; font-weight: 500; font-variant-numeric: tabular-nums; }
-.baselines span { color: var(--ink-2); font-size: 12px; }
-.weekhead { font-size: 16px; font-weight: 500; margin: 32px 0 4px; display: flex; gap: 8px; align-items: baseline; }
+.weekhead { font-size: 14px; font-weight: 500; margin: 28px 0 4px; padding-bottom: 6px; border-bottom: 1px solid var(--line); display: flex; gap: 8px; align-items: baseline; }
 .weekhead span { color: var(--ink-2); font-weight: 400; font-size: 13px; }
-.card.x { grid-template-columns: 246px 1fr; }
-.card.x h3 { font-size: 16px; line-height: 22px; }
 
 /* --- watch page -------------------------------------------------------- */
 .watch { display: grid; grid-template-columns: minmax(0, 1fr) 402px; gap: 24px; margin-top: 16px; }
@@ -246,6 +321,17 @@ h1.title { font-size: 36px; line-height: 44px; font-weight: 700; letter-spacing:
 .owner { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
 .owner b { font-weight: 500; font-size: 16px; }
 .owner .meta { font-size: 12px; }
+.scorecard { margin-top: 16px; display: grid; gap: 4px; }
+.score-main { border: 1px solid var(--card-line); border-radius: var(--radius-panel); padding: 16px 20px; }
+.score-main .label, .attr-grid span { color: var(--ink-2); font-size: 12px; }
+.score-main .perf { margin: 6px 0 4px; }
+.score-main .meta { margin: 6px 0 0; font-size: 13px; }
+.scorecard .stats { margin: 8px 0 0; }
+.attr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px 16px; }
+.attr-grid div { display: flex; flex-direction: column; gap: 2px; border-left: 2px solid var(--track); padding-left: 10px; }
+.attr-grid b { font-weight: 500; }
+.rationale { color: var(--ink-2); margin: 16px 0 0; max-width: 46em; }
+.rationale b { color: var(--ink); font-weight: 500; }
 .desc { background: var(--chip); border-radius: var(--radius-panel); padding: 12px 16px 16px; margin-top: 12px; }
 .desc .meta { color: var(--ink); font-weight: 500; }
 .desc dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 16px 0 0; }
@@ -304,8 +390,10 @@ table.runs th { color: var(--ink-2); font-weight: 500; font-size: 12px; }
 
 /* --- responsive -------------------------------------------------------- */
 @media (max-width: 1100px) {
-  .watch { grid-template-columns: 1fr; }
+  .watch { grid-template-columns: minmax(0, 1fr); }
   .card { grid-template-columns: 300px 1fr; }
+  .feat { grid-template-columns: 260px 1fr; }
+  .row { grid-template-columns: 140px 1fr 160px; }
 }
 @media (max-width: 860px) {
   .guide { position: fixed; left: 0; top: var(--mast); background: var(--bg); z-index: 30; transform: translateX(-100%); transition: transform .2s; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
@@ -320,9 +408,16 @@ table.runs th { color: var(--ink-2); font-weight: 500; font-size: 12px; }
   .logo span.word { display: none; }
   .weeknav > a, .weeknav > span { padding: 0 10px; font-size: 13px; }
   h1.title { font-size: 28px; line-height: 36px; }
-  .headline { font-size: 21px; line-height: 30px; }
-  .card, .card.x { grid-template-columns: 1fr; gap: 10px; }
-  .grid { grid-template-columns: 1fr; }
+  .card { grid-template-columns: 1fr; gap: 10px; }
+  .headline { font-size: 23px; line-height: 30px; }
+  .feat { grid-template-columns: 1fr; gap: 12px; }
+  .row { grid-template-columns: 120px 1fr; gap: 12px; }
+  .row .aside { grid-column: 2; flex-direction: row; align-items: center; flex-wrap: wrap; }
+  .row .attrs { display: none; }
+  .glance { grid-template-columns: 1fr; }
+  .perf.md .scale { width: 160px; }
+  .method { display: block; margin: 4px 0 0; width: max-content; }
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .brand-head { flex-wrap: wrap; }
   .trend { margin-left: 0; width: 100%; }
   .runpill { display: none; }

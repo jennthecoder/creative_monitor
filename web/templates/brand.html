@@ -9,33 +9,48 @@
     <div>
       <h1>{{ brand.name }}</h1>
       <div class="meta num">{{ total }} videos tracked · <a class="link" href="https://www.youtube.com/channel/{{ brand.channel_id }}" target="_blank" rel="noopener">View on YouTube</a></div>
-      <div class="meta">{{ ui.trend(trend) }}</div>
     </div>
   </div>
 
-  <div class="baselines" title="Median views of this channel's last 20 videos of each format that are at least 7 days old">
+  <div class="stats" title="Median views of this channel's last 20 videos of each format that are at least 7 days old">
     {% for k in ['short', 'clip', 'episode'] if counts[k] %}
-    <div><b>{{ baselines[k] or '—' }}</b><span>{{ bucket_names[k] | capitalize }} median · {{ counts[k] }} tracked</span></div>
+    {{ ui.stat(bucket_names[k] | capitalize ~ ' median', baselines[k] or '—', counts[k] ~ ' tracked') }}
     {% endfor %}
+    {% if trend.dir %}{{ ui.stat('Uploads this week', trend.this, 'usually ' ~ trend.usual ~ '/wk') }}{% endif %}
   </div>
 
   {% if shift %}{{ ui.shift(shift) }}{% endif %}
+
   {% if winners %}
+  <h2 class="sh">What’s working <span class="note">share of videos with this attribute that beat 1.5x their format median</span></h2>
   {{ ui.patterns(winners) }}
   {% endif %}
 
-  <div class="chips" role="navigation" aria-label="Filter by format">
-    <a class="chip {{ 'on' if not fmt }}" href="{{ url_for('brand_page', slug=slug) }}">All</a>
-    {% for k in ['short', 'clip', 'episode'] if counts[k] %}
-    <a class="chip {{ 'on' if fmt == k }}" href="{{ url_for('brand_page', slug=slug, format=k) }}">{{ bucket_names[k] | capitalize }}</a>
-    {% endfor %}
+  <h2 class="sh">Videos</h2>
+  <div class="toolbar">
+    <div class="chips" role="navigation" aria-label="Filter by format">
+      <a class="chip {{ 'on' if not fmt }}" href="{{ url_for('brand_page', slug=slug, sort=sort) }}">All</a>
+      {% for k in ['short', 'clip', 'episode'] if counts[k] %}
+      <a class="chip {{ 'on' if fmt == k }}" href="{{ url_for('brand_page', slug=slug, format=k, sort=sort) }}">{{ bucket_names[k] | capitalize }}</a>
+      {% endfor %}
+    </div>
+    <div class="seg" role="navigation" aria-label="Sort">
+      <a class="{{ 'on' if not sort }}" href="{{ url_for('brand_page', slug=slug, format=fmt) }}">Newest</a>
+      <a class="{{ 'on' if sort == 'best' }}" href="{{ url_for('brand_page', slug=slug, format=fmt, sort='best') }}">Best</a>
+      <a class="{{ 'on' if sort == 'weakest' }}" href="{{ url_for('brand_page', slug=slug, format=fmt, sort='weakest') }}">Weakest</a>
+    </div>
   </div>
 
-  {% for monday, cards in weeks.items() %}
-  <div class="weekhead">Week of {{ monday | dt('%d %b %Y') }} <span class="num">{{ cards | length }} video{{ 's' if cards | length != 1 }}</span></div>
-  {% for c in cards %}{{ ui.card(c, expanded=True) }}{% endfor %}
+  {% if sort %}
+    {% if sorted_cards %}<div class="rows">{% for c in sorted_cards %}{{ ui.row(c) }}{% endfor %}</div>
+    {% else %}<div class="quiet">No judged videos yet — they need to be at least 7 days old.</div>{% endif %}
   {% else %}
-  <div class="quiet">No {{ bucket_names[fmt] if fmt else 'videos' }} tracked for this channel yet.</div>
-  {% endfor %}
+    {% for monday, cards in weeks.items() %}
+    <div class="weekhead">Week of {{ monday | dt('%d %b %Y') }} <span class="num">{{ cards | length }} video{{ 's' if cards | length != 1 }}</span></div>
+    <div class="rows">{% for c in cards %}{{ ui.row(c) }}{% endfor %}</div>
+    {% else %}
+    <div class="quiet">No {{ bucket_names[fmt] if fmt else 'videos' }} tracked for this channel yet.</div>
+    {% endfor %}
+  {% endif %}
 </div>
 {% endblock %}

@@ -1,4 +1,8 @@
-{# Shared components. Every visual rule from the design spec lives here once. #}
+{# Shared components. Every visual rule from the design spec lives here once.
+
+   Hierarchy, top to bottom: the story (headline) → insights (patterns, shifts) →
+   evidence (breakouts, then misses) → early signal (just launched) → footnotes.
+   Red (--accent-out) marks outperformance only. #}
 
 {% macro perf(c, size='') -%}
 {# Index vs the brand's own median for the same format. The 1.0x baseline marker is
@@ -21,9 +25,13 @@
 {% endif %}
 {%- endmacro %}
 
-{% macro chips(c, levers_only=False) -%}
-{# levers_only: just hook / angle / topic, for dense grids. #}
-{% set items = (c.chips | selectattr('key', 'in', ['hook_type', 'angle', 'topic']) | list) if levers_only else c.chips %}
+{% macro chips(c, levers_only=False, limit=3) -%}
+{# Levers: the creative choices a strategist can copy. The full tag set lives on
+   the video page; cards show at most `limit` so the insight isn't buried. #}
+{% if levers_only %}
+  {% set items = [] %}
+  {% for key in ['hook_type', 'angle', 'topic', 'title_style', 'format', 'guest_type'] %}{% for ch in c.chips if ch.key == key %}{% if items | length < limit %}{% set _ = items.append(ch) %}{% endif %}{% endfor %}{% endfor %}
+{% else %}{% set items = c.chips %}{% endif %}
 {% if items %}
 <div class="attrs">{% for ch in items %}<span class="attr"><i>{{ ch.dim }}</i>{{ ch.value }}</span>{% endfor %}</div>
 {% endif %}
@@ -36,44 +44,62 @@
 {%- endmacro %}
 
 {% macro thumb(c, large=False) -%}
-<a class="thumb" href="{{ url_for('video_page', video_id=c.video_id) }}">
+<a class="thumb" href="{{ url_for('video_page', video_id=c.video_id) }}" tabindex="-1">
   {% if large %}<img src="{{ c.thumb_large }}" data-fallback="{{ c.thumb }}" alt="" loading="lazy">
   {% else %}<img src="{{ c.thumb }}" alt="" loading="lazy">{% endif %}
   <span class="badge">{{ 'SHORTS' if c.bucket == 'short' else c.duration }}</span>
 </a>
 {%- endmacro %}
 
-{% macro card(c, expanded=False, show_brand=False) -%}
-{# Compact row in the digest; expanded (.x) in channel history. #}
-<article class="card {{ 'x' if expanded }}">
-  {{ thumb(c, large=not expanded) }}
+{% macro read_pill(c) -%}
+{# Reach vs resonance: a title/thumbnail win is not a content win. #}
+{% if c.read %}<span class="pill {{ c.read.key }}" title="{{ c.read.text }}">{{ c.read.label }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro read(c) -%}
+{% if c.read %}<div class="read">{{ read_pill(c) }}<span>{{ c.read.text }}</span></div>{% endif %}
+{%- endmacro %}
+
+{% macro audience(c) -%}
+{% if c.theme_line %}<div class="audience"><b>Audience</b><span>{{ c.theme_line }}</span></div>{% endif %}
+{%- endmacro %}
+
+{% macro meta(c, show_brand=False) -%}
+<div class="meta num">{% if show_brand %}{{ c.brand }} · {% endif %}{{ c.views_text }} views · {{ c.ago }}{% if not c.too_early and c.engagement is not none %} · {{ c.engagement_text }} engagement{% endif %}</div>
+{%- endmacro %}
+
+{% macro feature(c) -%}
+{# Breakout: the evidence behind the week's story. Number first, then why. #}
+<article class="feat">
+  {{ thumb(c, large=True) }}
   <div class="body">
-    {% if c.verdict is defined and c.verdict %}<div class="verdict">{{ c.verdict }}</div>{% endif %}
+    {{ perf(c, 'md') }}
     <h3><a href="{{ url_for('video_page', video_id=c.video_id) }}">{{ c.title }}</a></h3>
-    <div class="meta num">{% if show_brand %}{{ c.brand }} · {% endif %}{{ c.views_text }} views · {{ c.ago }}{% if not c.too_early %} · {{ c.engagement_text }}{{ ' engagement' if c.engagement is not none }}{% endif %}</div>
-    {{ perf(c) }}
+    {{ meta(c) }}
     {{ read(c) }}
-    {{ chips(c) }}
-    {% if c.theme_line %}<div class="theme">{{ c.theme_line }}</div>
-    {% elif c.comments_off and expanded %}<div class="theme">Comments are turned off on this video.</div>{% endif %}
-    {% if not c.classified %}<div class="lowconf">Not classified</div>{% endif %}
+    {{ chips(c, levers_only=True) }}
+    {{ audience(c) }}
     {{ lowconf(c) }}
   </div>
 </article>
 {%- endmacro %}
 
-{% macro read(c) -%}
-{# Reach vs resonance: a title/thumbnail win is not a content win. #}
-{% if c.read %}<div class="read"><b>{{ c.read.label }}.</b> {{ c.read.text }}</div>{% endif %}
-{%- endmacro %}
-
-{% macro patterns(ps) -%}
-{# Hit rate, not a median: how often the attribute beat the channel's norm. #}
-{% if ps %}
-<ul class="working">
-  {% for p in ps %}<li><b>What’s working: {{ p.label }}.</b> <span class="num">{{ p.text }}</span>.{% if p.confirmed_by %} Also holds on {{ p.confirmed_by | join(', ') }}.{% endif %}{% if not p.age_matched %} <span class="note">Includes videos not yet compared at day 7.</span>{% endif %}</li>{% endfor %}
-</ul>
-{% endif %}
+{% macro row(c, with_audience=False) -%}
+{# Compact list row: misses in the digest, every video on the channel page. #}
+<article class="row">
+  {{ thumb(c) }}
+  <div class="body">
+    <h3><a href="{{ url_for('video_page', video_id=c.video_id) }}">{{ c.title }}</a></h3>
+    {{ meta(c) }}
+    {{ chips(c, levers_only=True) }}
+    {% if with_audience %}{{ audience(c) }}{% endif %}
+    {% if not c.classified %}<div class="lowconf">Not classified</div>{% endif %}
+  </div>
+  <div class="aside">
+    {{ perf(c) }}
+    {{ read_pill(c) }}
+  </div>
+</article>
 {%- endmacro %}
 
 {% macro tile(c) -%}
@@ -81,9 +107,33 @@
   {{ thumb(c, large=True) }}
   <h4><a href="{{ url_for('video_page', video_id=c.video_id) }}">{{ c.title }}</a></h4>
   <div class="meta num">{{ c.views_text }} views · {{ c.ago }}</div>
-  {% if c.index is not none %}<div class="early">{{ c.index_text }} {{ c.bucket_singular }} median so far · too early to judge</div>{% endif %}
-  {{ chips(c, levers_only=True) }}
+  {% if c.index is not none %}<div class="early num">{{ c.index_text }} {{ c.bucket_singular }} median so far</div>{% endif %}
+  {{ chips(c, levers_only=True, limit=2) }}
 </article>
+{%- endmacro %}
+
+{% macro pattern(p) -%}
+{# Hit rate, not a median: how often the attribute beat the channel's norm,
+   drawn against the channel's own rate so the lift is visible. #}
+<article class="pcard">
+  <div class="pstat num"><b>{{ p.hits }}</b><span>/{{ p.n }}</span></div>
+  <h4>{{ p.label | capitalize }}</h4>
+  <div class="pbar" aria-hidden="true">
+    <span class="fill" style="width:{{ (p.rate * 100) | round(1) }}%"></span>
+    <span class="mark" style="left:{{ (p.base_rate * 100) | round(1) }}%"></span>
+  </div>
+  <p class="num">{{ '%.0f' | format(p.rate * 100) }}% beat 1.5x their format median. Channel overall: {{ '%.0f' | format(p.base_rate * 100) }}%.</p>
+  {% if p.confirmed_by %}<div class="pill both">Also holds on {{ p.confirmed_by | join(', ') }}</div>{% endif %}
+  {% if not p.age_matched %}<div class="pnote">Includes videos not yet compared at day 7</div>{% endif %}
+</article>
+{%- endmacro %}
+
+{% macro patterns(ps) -%}
+{% if ps %}<div class="pgrid">{% for p in ps %}{{ pattern(p) }}{% endfor %}</div>{% endif %}
+{%- endmacro %}
+
+{% macro stat(label, value, sub='', cls='') -%}
+<div class="stat {{ cls }}"><span class="label">{{ label }}</span><b class="num">{{ value }}</b>{% if sub %}<span class="sub num">{{ sub }}</span>{% endif %}</div>
 {%- endmacro %}
 
 {% macro shift(s) -%}
