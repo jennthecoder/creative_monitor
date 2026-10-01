@@ -1,6 +1,8 @@
 name: Publish site
 
 # Renders the web app to static HTML and publishes it to GitHub Pages.
+# This must be the only workflow that deploys to Pages (Settings → Pages → Source:
+# GitHub Actions); a second one, e.g. GitHub's Jekyll starter, would overwrite it.
 # Runs after every daily/weekly data run (their commits use GITHUB_TOKEN, which
 # doesn't trigger push events), and on pushes that change the app or data.
 on:
